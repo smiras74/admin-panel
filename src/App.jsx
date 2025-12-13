@@ -30,9 +30,19 @@ import {
   Th,
   Td,
   Tooltip,
-  IconButton
+  IconButton,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
+  useDisclosure,
+  Tag,
+  Divider
 } from '@chakra-ui/react';
-import { CopyIcon, EmailIcon } from '@chakra-ui/icons';
+import { CopyIcon, EmailIcon, ViewIcon, CheckIcon, CloseIcon } from '@chakra-ui/icons';
 
 import {
   db,
@@ -47,6 +57,7 @@ import {
   collection,
   query,
   getDocs,
+  getDoc,
   where,
   updateDoc,
   doc,
@@ -55,10 +66,13 @@ import {
 } from 'firebase/firestore';
 
 
+// --- КОНФИГУРАЦИЯ КОЛЛЕКЦИЙ ---
 const COLLECTIONS = {
   USERS: 'users',
   WAITLIST: 'waitlist',
   MODERATION_QUEUE: 'moderation_queue',
+  // ВАЖНО: Убедитесь, что название коллекции с реальными точками правильное
+  VERIFIED_POIS: 'verified_pois', 
 };
 
 // ------------------------------------
@@ -97,59 +111,37 @@ const AuthScreen = () => {
 };
 
 // ------------------------------------
-// 2. DASHBOARD (С НОВЫМИ СЧЕТЧИКАМИ)
+// 2. DASHBOARD
 // ------------------------------------
 const Dashboard = () => {
-  const [stats, setStats] = useState({ 
-    waitlistTotal: 0, 
-    waitlistNew: 0,
-    userTotal: 0,
-    userNew: 0 
-  });
+  const [stats, setStats] = useState({ waitlistTotal: 0, waitlistNew: 0, userTotal: 0, userNew: 0 });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // Вычисляем время "24 часа назад"
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayTimestamp = Timestamp.fromDate(yesterday);
 
-        // 1. Лист ожидания (Всего)
         const waitlistTotalSnap = await getCountFromServer(collection(db, COLLECTIONS.WAITLIST));
-        
-        // 2. Лист ожидания (Новые за 24ч)
-        const waitlistNewQuery = query(
-          collection(db, COLLECTIONS.WAITLIST), 
-          where('timestamp', '>=', yesterdayTimestamp)
-        );
-        const waitlistNewSnap = await getCountFromServer(waitlistNewQuery);
-
-        // 3. Пользователи (Всего)
+        const waitlistNewSnap = await getCountFromServer(query(collection(db, COLLECTIONS.WAITLIST), where('timestamp', '>=', yesterdayTimestamp)));
         const usersTotalSnap = await getCountFromServer(collection(db, COLLECTIONS.USERS));
-
-        // 4. Пользователи (Новые за 24ч)
-        // Примечание: Это сработает, если у пользователей в базе есть поле 'timestamp' или 'createdAt'
-        // Если поле называется иначе, здесь будет 0.
-        const usersNewQuery = query(
-          collection(db, COLLECTIONS.USERS), 
-          where('timestamp', '>=', yesterdayTimestamp)
-        );
-        const usersNewSnap = await getCountFromServer(usersNewQuery);
+        // Для подсчета новых юзеров нужно поле timestamp в коллекции users
+        let userNewCount = 0;
+        try {
+            const usersNewSnap = await getCountFromServer(query(collection(db, COLLECTIONS.USERS), where('timestamp', '>=', yesterdayTimestamp)));
+            userNewCount = usersNewSnap.data().count;
+        } catch (e) { console.log("Нет поля timestamp у юзеров для подсчета новых"); }
 
         setStats({
           waitlistTotal: waitlistTotalSnap.data().count,
           waitlistNew: waitlistNewSnap.data().count,
           userTotal: usersTotalSnap.data().count,
-          userNew: usersNewSnap.data().count,
+          userNew: userNewCount,
         });
 
-      } catch (e) {
-        console.error("Ошибка загрузки статистики:", e);
-      } finally {
-        setIsLoading(false);
-      }
+      } catch (e) { console.error(e); } finally { setIsLoading(false); }
     };
     fetchStats();
   }, []);
@@ -158,34 +150,27 @@ const Dashboard = () => {
 
   return (
     <HStack spacing={8} p={4} align="start">
-      {/* Карточка Листа Ожидания */}
       <Stat p={5} shadow="md" border="1px" borderColor="gray.200" borderRadius="md" bg="white">
         <StatLabel fontSize="lg" color="gray.500">Лист ожидания</StatLabel>
         <Flex align="baseline" mt={2}>
           <StatNumber fontSize="4xl">{stats.waitlistTotal}</StatNumber>
           {stats.waitlistNew > 0 && (
             <StatHelpText ml={2} mb={0} color="green.500" fontWeight="bold">
-              <StatArrow type='increase' />
-              {stats.waitlistNew} за 24ч
+              <StatArrow type='increase' />{stats.waitlistNew} за 24ч
             </StatHelpText>
           )}
         </Flex>
-        {stats.waitlistNew === 0 && <Text fontSize="sm" color="gray.400">Нет новых за сутки</Text>}
       </Stat>
-
-      {/* Карточка Пользователей */}
       <Stat p={5} shadow="md" border="1px" borderColor="gray.200" borderRadius="md" bg="white">
         <StatLabel fontSize="lg" color="gray.500">Пользователи</StatLabel>
         <Flex align="baseline" mt={2}>
           <StatNumber fontSize="4xl">{stats.userTotal}</StatNumber>
           {stats.userNew > 0 && (
             <StatHelpText ml={2} mb={0} color="green.500" fontWeight="bold">
-              <StatArrow type='increase' />
-              {stats.userNew} за 24ч
+              <StatArrow type='increase' />{stats.userNew} за 24ч
             </StatHelpText>
           )}
         </Flex>
-        {stats.userNew === 0 && <Text fontSize="sm" color="gray.400">Нет новых за сутки</Text>}
       </Stat>
     </HStack>
   );
@@ -204,22 +189,10 @@ const WaitlistTable = () => {
     try {
       const q = query(collection(db, COLLECTIONS.WAITLIST));
       const snapshot = await getDocs(q);
-      
-      // Сортируем вручную по дате (новые сверху), чтобы не требовать сложный индекс Firestore
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      data.sort((a, b) => {
-        const dateA = a.timestamp?.seconds || 0;
-        const dateB = b.timestamp?.seconds || 0;
-        return dateB - dateA; // По убыванию
-      });
-      
+      data.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
       setList(data);
-    } catch (error) {
-      console.error(error);
-      toast({ status: 'error', title: 'Ошибка загрузки', description: error.message });
-    } finally {
-      setLoading(false);
-    }
+    } catch (error) { toast({ status: 'error', title: 'Ошибка загрузки' }); } finally { setLoading(false); }
   };
 
   useEffect(() => { fetchWaitlist(); }, []);
@@ -235,7 +208,6 @@ const WaitlistTable = () => {
         <Heading size="md">Заявки ({list.length})</Heading>
         <Button size="sm" onClick={fetchWaitlist}>Обновить</Button>
       </HStack>
-      
       {loading ? <Spinner /> : (
         <Box overflowX="auto">
         <Table variant="simple" size="sm">
@@ -249,24 +221,8 @@ const WaitlistTable = () => {
                 </Td>
                 <Td>
                   <HStack spacing={2}>
-                    <Tooltip label="Копировать">
-                      <IconButton 
-                        icon={<CopyIcon />} 
-                        size="sm" 
-                        variant="ghost"
-                        onClick={() => copyToClipboard(item.email)} 
-                      />
-                    </Tooltip>
-                    <Tooltip label="Написать письмо">
-                      <IconButton 
-                        as="a" 
-                        href={`mailto:${item.email}`}
-                        icon={<EmailIcon />} 
-                        size="sm" 
-                        colorScheme="blue"
-                        variant="ghost"
-                      />
-                    </Tooltip>
+                    <IconButton icon={<CopyIcon />} size="sm" variant="ghost" onClick={() => copyToClipboard(item.email)} aria-label="Copy" />
+                    <IconButton as="a" href={`mailto:${item.email}`} icon={<EmailIcon />} size="sm" colorScheme="blue" variant="ghost" aria-label="Email" />
                   </HStack>
                 </Td>
               </Tr>
@@ -279,12 +235,172 @@ const WaitlistTable = () => {
   );
 };
 
+// =================================================================
+// НОВЫЕ КОМПОНЕНТЫ ДЛЯ СРАВНЕНИЯ (DIFF)
+// =================================================================
+
+// Вспомогательный компонент строки сравнения: подсвечивает разницу
+const DiffRow = ({ label, oldVal, newVal }) => {
+  // Считаем значение измененным, если оно отличается и новое значение не пустое
+  const isDifferent = oldVal !== newVal && newVal !== undefined && newVal !== null && newVal !== '';
+
+  // Если оба значения пусты, не показываем строку
+  if ((!oldVal && !newVal) || (oldVal === undefined && newVal === undefined)) return null;
+
+  return (
+    <Tr bg={isDifferent ? "green.50" : "transparent"}>
+      <Td fontWeight="bold" w="200px" color="gray.600">{label}</Td>
+      <Td color="gray.500" fontSize="sm">
+        <Text noOfLines={4} title={oldVal}>{oldVal !== undefined && oldVal !== null && oldVal !== '' ? oldVal.toString() : '—'}</Text>
+      </Td>
+      <Td fontWeight={isDifferent ? "bold" : "normal"} color={isDifferent ? "green.700" : "black"}>
+         <Text noOfLines={4} title={newVal}>{newVal !== undefined && newVal !== null && newVal !== '' ? newVal.toString() : '—'}</Text>
+         {isDifferent && <Tag size="sm" colorScheme="green" ml={2} mt={1}>Изменено</Tag>}
+      </Td>
+    </Tr>
+  );
+};
+
+
+// Модальное окно обзора и сравнения
+const ReviewModal = ({ isOpen, onClose, proposal, onProcess }) => {
+  const [originalDoc, setOriginalDoc] = useState(null);
+  const [loadingOriginal, setLoadingOriginal] = useState(false);
+
+  // При открытии окна, если это РЕДАКТИРОВАНИЕ, загружаем оригинал
+  useEffect(() => {
+    if (isOpen && proposal && proposal.type !== 'new_poi' && proposal.poiId) {
+      setLoadingOriginal(true);
+      const fetchOriginal = async () => {
+        try {
+            // ВАЖНО: Используем ID из поля proposal.poiId для поиска в коллекции VERIFIED_POIS
+            const docRef = doc(db, COLLECTIONS.VERIFIED_POIS, proposal.poiId);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                setOriginalDoc(docSnap.data());
+            } else {
+                setOriginalDoc({ error: "Оригинальный документ не найден" });
+            }
+        } catch (e) {
+            console.error("Ошибка при загрузке оригинала:", e);
+            setOriginalDoc({ error: "Ошибка загрузки" });
+        } finally {
+            setLoadingOriginal(false);
+        }
+      };
+      fetchOriginal();
+    } else {
+        // Сброс при закрытии или если это новая точка
+        setOriginalDoc(null);
+    }
+  }, [isOpen, proposal]);
+
+
+  if (!proposal) return null;
+
+  const isNew = proposal.type === 'new_poi';
+  const isEdit = !isNew;
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} size="4xl" scrollBehavior="inside">
+      <ModalOverlay />
+      <ModalContent>
+        <ModalHeader>
+            Обзор предложения
+            {isNew ? <Tag ml={2} colorScheme="blue">Новая точка</Tag> : <Tag ml={2} colorScheme="orange">Изменение</Tag>}
+        </ModalHeader>
+        <ModalCloseButton />
+        <ModalBody>
+          <VStack align="start" spacing={4}>
+            <Box>
+                <Text fontWeight="bold">ID Предложения:</Text> <Text fontSize="sm" fontFamily="mono">{proposal.id}</Text>
+                {isEdit && <><Text fontWeight="bold" mt={2}>ID Оригинальной точки:</Text> <Text fontSize="sm" fontFamily="mono">{proposal.poiId}</Text></>}
+                <Text fontWeight="bold" mt={2}>Автор (User ID):</Text> <Text fontSize="sm" fontFamily="mono">{proposal.userId}</Text>
+            </Box>
+            
+            <Divider />
+
+            {loadingOriginal ? (
+               <Flex w="full" justify="center" p={10}><Spinner label="Загрузка оригинала..." /></Flex>
+            ) : (
+              <Table variant="simple" size="md" border="1px" borderColor="gray.200">
+                <Thead bg="gray.100">
+                  <Tr>
+                    <Th>Поле</Th>
+                    <Th>Было (Оригинал)</Th>
+                    <Th>Стало (Предложение)</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {/* ВАЖНО: Здесь мы сопоставляем поля. 
+                      Слева (oldVal) - как поле называется в реальной базе (originalDoc).
+                      Справа (newVal) - как поле называется в заявке на модерацию (proposal).
+                      Подправьте названия полей (например, 'name' или 'description'), если они отличаются в вашей базе.
+                  */}
+                  <DiffRow 
+                    label="Название" 
+                    oldVal={originalDoc?.name} // Предполагаем, что в оригинале поле называется 'name'
+                    newVal={proposal.suggestedName || proposal.suggestedNameNew} // В заявке 'suggestedName'
+                  />
+                  <DiffRow 
+                    label="Описание" 
+                    oldVal={originalDoc?.description} 
+                    newVal={proposal.suggestedDescription} 
+                  />
+                   <DiffRow 
+                    label="Категория" 
+                    oldVal={originalDoc?.category} 
+                    newVal={proposal.suggestedCategory} 
+                  />
+                  <DiffRow 
+                    label="Тип" 
+                    oldVal={originalDoc?.type} 
+                    newVal={proposal.suggestedType} 
+                  />
+                   <DiffRow 
+                    label="Широта (Lat)" 
+                    oldVal={originalDoc?.latitude} 
+                    newVal={proposal.latitude} 
+                  />
+                   <DiffRow 
+                    label="Долгота (Lng)" 
+                    oldVal={originalDoc?.longitude} 
+                    newVal={proposal.longitude} 
+                  />
+                   {/* Для новых точек, где нет оригинала, просто покажем предложенные данные */}
+                   {isNew && (
+                     <Tr>
+                       <Td colSpan={3} bg="blue.50" textAlign="center" color="gray.500" fontSize="sm">
+                         Это новая точка. Данных "Было" нет.
+                       </Td>
+                     </Tr>
+                   )}
+                </Tbody>
+              </Table>
+            )}
+          </VStack>
+        </ModalBody>
+        <ModalFooter bg="gray.50">
+            <HStack spacing={4}>
+                <Button variant="ghost" onClick={onClose}>Закрыть</Button>
+                <Button leftIcon={<CloseIcon />} colorScheme="red" onClick={() => onProcess(proposal.id, 'rejected')}>Отклонить</Button>
+                <Button leftIcon={<CheckIcon />} colorScheme="green" onClick={() => onProcess(proposal.id, 'approved')}>Одобрить</Button>
+            </HStack>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
+  );
+};
+
+
 // ------------------------------------
-// 4. МОДЕРАЦИЯ
+// 4. МОДЕРАЦИЯ (С кнопкой Обзора)
 // ------------------------------------
 const ModerationTable = () => {
   const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [selectedProposal, setSelectedProposal] = useState(null);
+  const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
 
   const fetchProposals = async () => {
@@ -299,37 +415,61 @@ const ModerationTable = () => {
 
   useEffect(() => { fetchProposals(); }, []);
 
-  const handleStatus = async (id, status) => {
+  // Функция обработки (Одобрить/Отклонить), передается в модальное окно
+  const handleProcess = async (id, status) => {
     try {
       await updateDoc(doc(db, COLLECTIONS.MODERATION_QUEUE, id), { status });
       setProposals(prev => prev.filter(p => p.id !== id));
       toast({ status: 'success', title: status === 'approved' ? 'Одобрено' : 'Отклонено' });
-    } catch (e) { toast({ status: 'error', title: 'Ошибка' }); }
+      onClose(); // Закрываем окно после обработки
+    } catch (e) { toast({ status: 'error', title: 'Ошибка при обработке' }); }
   };
+
+  // Открытие окна обзора
+  const handleReview = (proposal) => {
+      setSelectedProposal(proposal);
+      onOpen();
+  }
 
   return (
     <Box p={4}>
       <HStack justify="space-between" mb={4}>
-        <Heading size="md">Очередь Модерации</Heading>
+        <Heading size="md">Очередь Модерации ({proposals.length})</Heading>
         <Button size="sm" onClick={fetchProposals}>Обновить</Button>
       </HStack>
-      {loading ? <Spinner /> : proposals.length === 0 ? <Text color="gray.500">Очередь пуста</Text> : (
+      {loading ? <Spinner /> : proposals.length === 0 ? <Text color="gray.500">Очередь пуста. Хорошая работа!</Text> : (
         <Table variant="simple" size="sm">
-          <Thead><Tr><Th>Название</Th><Th>Тип</Th><Th>Действия</Th></Tr></Thead>
+          <Thead><Tr><Th>Название</Th><Th>Тип</Th><Th textAlign="center">Действия</Th></Tr></Thead>
           <Tbody>
             {proposals.map(p => (
               <Tr key={p.id}>
-                <Td>{p.suggestedName || p.suggestedNameNew}</Td>
-                <Td>{p.type === 'new_poi' ? 'Новое' : 'Правка'}</Td>
+                <Td fontWeight="medium">{p.suggestedName || p.suggestedNameNew || '—'}</Td>
                 <Td>
-                  <Button size="xs" colorScheme="green" mr={2} onClick={() => handleStatus(p.id, 'approved')}>Да</Button>
-                  <Button size="xs" colorScheme="red" onClick={() => handleStatus(p.id, 'rejected')}>Нет</Button>
+                    {p.type === 'new_poi' ? <Tag size="sm" colorScheme="blue">Новое</Tag> : <Tag size="sm" colorScheme="orange">Правка</Tag>}
+                </Td>
+                <Td textAlign="center">
+                  <HStack justify="center" spacing={2}>
+                    <Tooltip label="Обзор и Сравнение">
+                        <IconButton icon={<ViewIcon />} colorScheme="teal" size="sm" onClick={() => handleReview(p)} aria-label="Review" />
+                    </Tooltip>
+                    {/* Кнопки быстрого действия тоже оставим */}
+                    <IconButton icon={<CheckIcon />} colorScheme="green" variant="outline" size="sm" onClick={() => handleProcess(p.id, 'approved')} aria-label="Approve" />
+                    <IconButton icon={<CloseIcon />} colorScheme="red" variant="outline" size="sm" onClick={() => handleProcess(p.id, 'rejected')} aria-label="Reject" />
+                  </HStack>
                 </Td>
               </Tr>
             ))}
           </Tbody>
         </Table>
       )}
+      
+      {/* Модальное окно, которое открывается по кнопке Обзор */}
+      <ReviewModal 
+        isOpen={isOpen} 
+        onClose={onClose} 
+        proposal={selectedProposal} 
+        onProcess={handleProcess}
+      />
     </Box>
   );
 };
