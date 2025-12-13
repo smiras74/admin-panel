@@ -78,7 +78,7 @@ const COLLECTIONS = {
 };
 
 // ------------------------------------
-// 1. АУТЕНТИФИКАЦИЯ
+// 1. АУТЕНТИФИКАЦИЯ (С ЗАЩИТОЙ АДМИНА)
 // ------------------------------------
 const AuthScreen = () => {
   const [email, setEmail] = useState('');
@@ -87,10 +87,24 @@ const AuthScreen = () => {
   const toast = useToast();
 
   const handleLogin = async () => {
+    // !!! СПИСОК АДМИНОВ !!!
+    // Только эти почты смогут войти в панель
+    const ADMIN_EMAILS = ['7715582@mail.ru', '7715582@gmail.com'];
+
     setIsLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      toast({ status: 'success', title: 'Вход выполнен' });
+      // 1. Пытаемся авторизоваться в Firebase
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // 2. Проверяем, есть ли почта в списке админов
+      // (Приводим к нижнему регистру на случай, если ввели с большой буквы)
+      if (!ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+        await signOut(auth); // Выкидываем пользователя
+        throw new Error("Доступ запрещен. Этот аккаунт не является администратором.");
+      }
+
+      toast({ status: 'success', title: 'Вход выполнен', description: 'Добро пожаловать, Шеф!' });
     } catch (error) {
       toast({ status: 'error', title: 'Ошибка входа', description: error.message });
     } finally {
@@ -179,7 +193,7 @@ const Dashboard = () => {
 };
 
 // ------------------------------------
-// 3. ТАБЛИЦА ПОЛЬЗОВАТЕЛЕЙ (НОВОЕ!)
+// 3. ТАБЛИЦА ПОЛЬЗОВАТЕЛЕЙ
 // ------------------------------------
 const UsersTable = () => {
   const [users, setUsers] = useState([]);
