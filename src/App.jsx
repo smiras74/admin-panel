@@ -43,9 +43,13 @@ import {
   Divider,
   Avatar,
   InputGroup,
-  InputLeftElement
+  InputLeftElement,
+  SimpleGrid,
+  Container,
+  Badge,
+  extendTheme
 } from '@chakra-ui/react';
-import { CopyIcon, EmailIcon, ViewIcon, CheckIcon, CloseIcon, SearchIcon } from '@chakra-ui/icons';
+import { CopyIcon, EmailIcon, ViewIcon, CheckIcon, CloseIcon, SearchIcon, TimeIcon, StarIcon } from '@chakra-ui/icons';
 
 import {
   db,
@@ -68,6 +72,22 @@ import {
   Timestamp
 } from 'firebase/firestore';
 
+// --- НАСТРОЙКА ТЕМЫ ---
+const theme = extendTheme({
+  fonts: {
+    heading: `'Inter', sans-serif`,
+    body: `'Inter', sans-serif`,
+  },
+  colors: {
+    brand: {
+      50: '#E6FFFA',
+      100: '#B2F5EA',
+      500: '#319795',
+      600: '#2C7A7B',
+      900: '#234E52',
+    }
+  }
+});
 
 // --- КОНФИГУРАЦИЯ КОЛЛЕКЦИЙ ---
 const COLLECTIONS = {
@@ -78,7 +98,7 @@ const COLLECTIONS = {
 };
 
 // ------------------------------------
-// 1. АУТЕНТИФИКАЦИЯ (С ЗАЩИТОЙ АДМИНА)
+// 1. АУТЕНТИФИКАЦИЯ (КРАСИВЫЙ ДИЗАЙН)
 // ------------------------------------
 const AuthScreen = () => {
   const [email, setEmail] = useState('');
@@ -88,38 +108,77 @@ const AuthScreen = () => {
 
   const handleLogin = async () => {
     // !!! СПИСОК АДМИНОВ !!!
-    // Только эти почты смогут войти в панель
     const ADMIN_EMAILS = ['7715582@mail.ru', '7715582@gmail.com'];
 
     setIsLoading(true);
     try {
-      // 1. Пытаемся авторизоваться в Firebase
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // 2. Проверяем, есть ли почта в списке админов
-      // (Приводим к нижнему регистру на случай, если ввели с большой буквы)
       if (!ADMIN_EMAILS.includes(user.email.toLowerCase())) {
-        await signOut(auth); // Выкидываем пользователя
-        throw new Error("Доступ запрещен. Этот аккаунт не является администратором.");
+        await signOut(auth);
+        throw new Error("Доступ запрещен. Вы не администратор.");
       }
 
-      toast({ status: 'success', title: 'Вход выполнен', description: 'Добро пожаловать, Шеф!' });
+      toast({ status: 'success', title: 'Добро пожаловать!', description: 'Успешный вход в систему.', position: 'top' });
     } catch (error) {
-      toast({ status: 'error', title: 'Ошибка входа', description: error.message });
+      toast({ status: 'error', title: 'Ошибка входа', description: error.message, position: 'top' });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <Flex minH="100vh" align="center" justify="center" bg="gray.50">
-      <Box p={8} maxW="400px" borderWidth={1} borderRadius={8} boxShadow="lg" bg="white">
-        <Heading mb={6} textAlign="center">Вход в Админку</Heading>
-        <VStack spacing={4}>
-          <Input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <Input type="password" placeholder="Пароль" value={password} onChange={(e) => setPassword(e.target.value)} />
-          <Button colorScheme="blue" w="full" onClick={handleLogin} isLoading={isLoading}>Войти</Button>
+    <Flex minH="100vh" align="center" justify="center" bgGradient="linear(to-br, blue.600, purple.700)">
+      <Box 
+        p={10} 
+        w="full" 
+        maxW="450px" 
+        bg="white" 
+        borderRadius="2xl" 
+        boxShadow="2xl"
+      >
+        <VStack spacing={6}>
+          <Box textAlign="center">
+            <Heading size="xl" color="gray.700" mb={2}>Admin Panel</Heading>
+            <Text color="gray.500">Guide du Détour</Text>
+          </Box>
+          
+          <VStack spacing={4} w="full">
+            <Input 
+              size="lg" 
+              placeholder="Email" 
+              bg="gray.50"
+              border="none"
+              _focus={{ bg: 'white', ring: 2, ringColor: 'blue.500' }}
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)} 
+            />
+            <Input 
+              size="lg" 
+              type="password" 
+              placeholder="Пароль" 
+              bg="gray.50"
+              border="none"
+              _focus={{ bg: 'white', ring: 2, ringColor: 'blue.500' }}
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+              onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+            />
+            <Button 
+              size="lg" 
+              colorScheme="blue" 
+              w="full" 
+              onClick={handleLogin} 
+              isLoading={isLoading}
+              loadingText="Вход..."
+              mt={4}
+              bgGradient="linear(to-r, blue.500, blue.600)"
+              _hover={{ bgGradient: "linear(to-r, blue.600, blue.700)" }}
+            >
+              Войти в систему
+            </Button>
+          </VStack>
         </VStack>
       </Box>
     </Flex>
@@ -127,8 +186,42 @@ const AuthScreen = () => {
 };
 
 // ------------------------------------
-// 2. DASHBOARD
+// 2. DASHBOARD (С КАРТОЧКАМИ)
 // ------------------------------------
+const StatCard = ({ label, value, diff, icon }) => (
+  <Box 
+    bg="white" 
+    p={6} 
+    borderRadius="xl" 
+    boxShadow="sm" 
+    borderLeft="4px solid" 
+    borderColor="blue.500"
+    transition="transform 0.2s"
+    _hover={{ transform: 'translateY(-2px)', boxShadow: 'md' }}
+  >
+    <Flex justify="space-between" align="start">
+      <Stat>
+        <StatLabel fontSize="sm" color="gray.500" fontWeight="bold" textTransform="uppercase" letterSpacing="wide">
+          {label}
+        </StatLabel>
+        <StatNumber fontSize="3xl" fontWeight="800" color="gray.700">
+          {value}
+        </StatNumber>
+        {diff > 0 ? (
+          <StatHelpText mb={0} color="green.500" fontWeight="bold">
+            <StatArrow type='increase' />{diff} за 24ч
+          </StatHelpText>
+        ) : (
+          <StatHelpText mb={0} color="gray.400" fontSize="xs">Нет новых за сутки</StatHelpText>
+        )}
+      </Stat>
+      <Box p={2} bg="blue.50" borderRadius="md" color="blue.500">
+        {icon}
+      </Box>
+    </Flex>
+  </Box>
+);
+
 const Dashboard = () => {
   const [stats, setStats] = useState({ waitlistTotal: 0, waitlistNew: 0, userTotal: 0, userNew: 0 });
   const [isLoading, setIsLoading] = useState(true);
@@ -162,33 +255,31 @@ const Dashboard = () => {
     fetchStats();
   }, []);
 
-  if (isLoading) return <Spinner />;
+  if (isLoading) return <Flex justify="center" p={10}><Spinner size="xl" color="blue.500" /></Flex>;
 
   return (
-    <HStack spacing={8} p={4} align="start">
-      <Stat p={5} shadow="md" border="1px" borderColor="gray.200" borderRadius="md" bg="white">
-        <StatLabel fontSize="lg" color="gray.500">Лист ожидания</StatLabel>
-        <Flex align="baseline" mt={2}>
-          <StatNumber fontSize="4xl">{stats.waitlistTotal}</StatNumber>
-          {stats.waitlistNew > 0 && (
-            <StatHelpText ml={2} mb={0} color="green.500" fontWeight="bold">
-              <StatArrow type='increase' />{stats.waitlistNew} за 24ч
-            </StatHelpText>
-          )}
-        </Flex>
-      </Stat>
-      <Stat p={5} shadow="md" border="1px" borderColor="gray.200" borderRadius="md" bg="white">
-        <StatLabel fontSize="lg" color="gray.500">Пользователи</StatLabel>
-        <Flex align="baseline" mt={2}>
-          <StatNumber fontSize="4xl">{stats.userTotal}</StatNumber>
-          {stats.userNew > 0 && (
-            <StatHelpText ml={2} mb={0} color="green.500" fontWeight="bold">
-              <StatArrow type='increase' />{stats.userNew} за 24ч
-            </StatHelpText>
-          )}
-        </Flex>
-      </Stat>
-    </HStack>
+    <VStack spacing={8} align="stretch">
+      <Box>
+        <Heading size="lg" mb={2}>Обзор</Heading>
+        <Text color="gray.500">Ключевые показатели на сегодня</Text>
+      </Box>
+      
+      <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
+        <StatCard 
+          label="Лист ожидания" 
+          value={stats.waitlistTotal} 
+          diff={stats.waitlistNew} 
+          icon={<TimeIcon boxSize={6} />}
+        />
+        <StatCard 
+          label="Пользователи" 
+          value={stats.userTotal} 
+          diff={stats.userNew} 
+          icon={<StarIcon boxSize={6} />}
+        />
+        {/* Можно добавить еще карточки в будущем */}
+      </SimpleGrid>
+    </VStack>
   );
 };
 
@@ -210,12 +301,11 @@ const UsersTable = () => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setUsers(data);
       setFilteredUsers(data);
-    } catch (error) { toast({ status: 'error', title: 'Ошибка загрузки пользователей' }); } finally { setLoading(false); }
+    } catch (error) { toast({ status: 'error', title: 'Ошибка загрузки' }); } finally { setLoading(false); }
   };
 
   useEffect(() => { fetchUsers(); }, []);
 
-  // Живой поиск
   useEffect(() => {
     if (!search) {
       setFilteredUsers(users);
@@ -233,52 +323,52 @@ const UsersTable = () => {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    toast({ status: 'success', title: 'ID скопирован', duration: 1000, position: 'top' });
+    toast({ status: 'success', title: 'Скопировано', duration: 1000 });
   };
 
   return (
-    <Box p={4}>
-      <HStack justify="space-between" mb={4}>
-        <Heading size="md">Пользователи ({users.length})</Heading>
-        <Button size="sm" onClick={fetchUsers}>Обновить</Button>
-      </HStack>
-
-      <InputGroup mb={6} maxW="400px">
-        <InputLeftElement pointerEvents='none'><SearchIcon color='gray.300' /></InputLeftElement>
-        <Input 
-          placeholder="Поиск по email или имени..." 
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          bg="white"
-        />
-      </InputGroup>
+    <Box bg="white" borderRadius="xl" shadow="sm" overflow="hidden">
+      <Flex p={6} justify="space-between" align="center" borderBottom="1px" borderColor="gray.100" bg="gray.50">
+        <Heading size="md">Пользователи <Badge ml={2} colorScheme="blue" borderRadius="full">{users.length}</Badge></Heading>
+        <HStack>
+            <InputGroup size="sm" w="250px">
+                <InputLeftElement pointerEvents='none'><SearchIcon color='gray.400' /></InputLeftElement>
+                <Input 
+                placeholder="Поиск..." 
+                bg="white" 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                borderRadius="md"
+                />
+            </InputGroup>
+            <Button size="sm" leftIcon={<TimeIcon />} onClick={fetchUsers} colorScheme="gray" variant="solid">Обновить</Button>
+        </HStack>
+      </Flex>
       
-      {loading ? <Spinner /> : (
+      {loading ? <Flex justify="center" p={10}><Spinner /></Flex> : (
         <Box overflowX="auto">
-        <Table variant="simple" size="sm">
-          <Thead><Tr><Th>Аватар</Th><Th>Пользователь</Th><Th>ID</Th><Th>Дата регистр.</Th><Th>Действия</Th></Tr></Thead>
+        <Table variant="simple">
+          <Thead bg="gray.50"><Tr><Th>Пользователь</Th><Th>ID</Th><Th>Регистрация</Th><Th>Действия</Th></Tr></Thead>
           <Tbody>
             {filteredUsers.map((user) => (
-              <Tr key={user.id}>
+              <Tr key={user.id} _hover={{ bg: "gray.50" }}>
                 <Td>
-                  <Avatar size="sm" name={user.displayName || user.name || user.email} src={user.photoUrl || user.photoURL} />
+                  <HStack>
+                    <Avatar size="sm" name={user.displayName || user.email} src={user.photoUrl || user.photoURL} border="2px solid white" boxShadow="sm" />
+                    <Box>
+                        <Text fontWeight="bold" fontSize="sm">{user.displayName || user.name || 'Без имени'}</Text>
+                        <Text fontSize="xs" color="gray.500">{user.email}</Text>
+                    </Box>
+                  </HStack>
                 </Td>
                 <Td>
-                  <VStack align="start" spacing={0}>
-                    <Text fontWeight="bold">{user.displayName || user.name || 'Без имени'}</Text>
-                    <Text fontSize="xs" color="gray.500">{user.email || 'Нет email'}</Text>
-                  </VStack>
+                   <Tag size="sm" variant="subtle" colorScheme="gray" fontFamily="mono">{user.id.substring(0,8)}...</Tag>
                 </Td>
-                <Td fontSize="xs" fontFamily="mono" color="gray.500" maxW="100px" isTruncated title={user.id}>
-                  {user.id}
-                </Td>
-                <Td fontSize="xs" color="gray.500">
+                <Td fontSize="sm" color="gray.600">
                   {user.timestamp?.seconds ? new Date(user.timestamp.seconds * 1000).toLocaleDateString() : '—'}
                 </Td>
                 <Td>
-                  <Tooltip label="Копировать ID">
-                    <IconButton icon={<CopyIcon />} size="sm" variant="ghost" onClick={() => copyToClipboard(user.id)} />
-                  </Tooltip>
+                    <IconButton aria-label="Copy" icon={<CopyIcon />} size="sm" variant="ghost" colorScheme="blue" onClick={() => copyToClipboard(user.id)} />
                 </Td>
               </Tr>
             ))}
@@ -314,30 +404,30 @@ const WaitlistTable = () => {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    toast({ status: 'success', title: 'Скопировано', duration: 1000, position: 'top' });
+    toast({ status: 'success', title: 'Скопировано', duration: 1000 });
   };
 
   return (
-    <Box p={4}>
-      <HStack justify="space-between" mb={4}>
-        <Heading size="md">Заявки ({list.length})</Heading>
-        <Button size="sm" onClick={fetchWaitlist}>Обновить</Button>
-      </HStack>
-      {loading ? <Spinner /> : (
+    <Box bg="white" borderRadius="xl" shadow="sm" overflow="hidden">
+      <Flex p={6} justify="space-between" align="center" borderBottom="1px" borderColor="gray.100" bg="gray.50">
+        <Heading size="md">Заявки Waitlist <Badge ml={2} colorScheme="purple" borderRadius="full">{list.length}</Badge></Heading>
+        <Button size="sm" leftIcon={<TimeIcon />} onClick={fetchWaitlist}>Обновить</Button>
+      </Flex>
+      {loading ? <Flex justify="center" p={10}><Spinner /></Flex> : (
         <Box overflowX="auto">
-        <Table variant="simple" size="sm">
-          <Thead><Tr><Th>Email</Th><Th>Дата</Th><Th>Действия</Th></Tr></Thead>
+        <Table variant="simple">
+          <Thead bg="gray.50"><Tr><Th>Email</Th><Th>Дата</Th><Th>Действия</Th></Tr></Thead>
           <Tbody>
             {list.map((item) => (
-              <Tr key={item.id}>
-                <Td fontWeight="bold">{item.email}</Td>
-                <Td fontSize="xs" color="gray.500">
+              <Tr key={item.id} _hover={{ bg: "gray.50" }}>
+                <Td fontWeight="bold" color="gray.700">{item.email}</Td>
+                <Td fontSize="sm" color="gray.500">
                   {item.timestamp?.seconds ? new Date(item.timestamp.seconds * 1000).toLocaleString('ru-RU') : '—'}
                 </Td>
                 <Td>
                   <HStack spacing={2}>
-                    <IconButton icon={<CopyIcon />} size="sm" variant="ghost" onClick={() => copyToClipboard(item.email)} aria-label="Copy" />
-                    <IconButton as="a" href={`mailto:${item.email}`} icon={<EmailIcon />} size="sm" colorScheme="blue" variant="ghost" aria-label="Email" />
+                    <Tooltip label="Копировать"><IconButton aria-label="Copy" icon={<CopyIcon />} size="sm" variant="ghost" onClick={() => copyToClipboard(item.email)} /></Tooltip>
+                    <Tooltip label="Написать"><IconButton aria-label="Write" as="a" href={`mailto:${item.email}`} icon={<EmailIcon />} size="sm" colorScheme="blue" variant="solid" /></Tooltip>
                   </HStack>
                 </Td>
               </Tr>
@@ -351,7 +441,7 @@ const WaitlistTable = () => {
 };
 
 // =================================================================
-// 5. МОДЕРАЦИЯ И СРАВНЕНИЕ (DIFF)
+// 5. МОДЕРАЦИЯ И СРАВНЕНИЕ
 // =================================================================
 
 const DiffRow = ({ label, oldVal, newVal }) => {
@@ -394,22 +484,25 @@ const ReviewModal = ({ isOpen, onClose, proposal, onProcess }) => {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="4xl" scrollBehavior="inside">
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader>
+      <ModalOverlay backdropFilter="blur(5px)" />
+      <ModalContent borderRadius="xl" overflow="hidden">
+        <ModalHeader bg="gray.50" borderBottom="1px" borderColor="gray.100">
             Обзор предложения {isNew ? <Tag ml={2} colorScheme="blue">Новая точка</Tag> : <Tag ml={2} colorScheme="orange">Изменение</Tag>}
         </ModalHeader>
         <ModalCloseButton />
-        <ModalBody>
-          <VStack align="start" spacing={4}>
-            <Box>
-                <Text fontWeight="bold">ID: <span style={{fontWeight:'normal'}}>{proposal.id}</span></Text>
-                <Text fontWeight="bold">Автор: <span style={{fontWeight:'normal'}}>{proposal.userId}</span></Text>
+        <ModalBody p={6}>
+          <VStack align="start" spacing={6}>
+            <Box w="full" bg="blue.50" p={4} borderRadius="md" borderLeft="4px solid" borderColor="blue.400">
+                <Text fontSize="xs" fontWeight="bold" color="blue.500" textTransform="uppercase">Метаданные</Text>
+                <SimpleGrid columns={2} spacing={4} mt={2}>
+                    <Box><Text fontSize="xs" color="gray.500">ID Заявки</Text><Text fontSize="sm" fontFamily="mono">{proposal.id}</Text></Box>
+                    <Box><Text fontSize="xs" color="gray.500">ID Автора</Text><Text fontSize="sm" fontFamily="mono">{proposal.userId}</Text></Box>
+                </SimpleGrid>
             </Box>
-            <Divider />
+            
             {loadingOriginal ? <Flex w="full" justify="center" p={10}><Spinner /></Flex> : (
-              <Table variant="simple" size="md" border="1px" borderColor="gray.200">
-                <Thead bg="gray.100"><Tr><Th>Поле</Th><Th>Было</Th><Th>Стало</Th></Tr></Thead>
+              <Table variant="simple" size="md" border="1px" borderColor="gray.200" borderRadius="md">
+                <Thead bg="gray.50"><Tr><Th>Поле</Th><Th>Было</Th><Th>Стало</Th></Tr></Thead>
                 <Tbody>
                   <DiffRow label="Название" oldVal={originalDoc?.name} newVal={proposal.suggestedName || proposal.suggestedNameNew} />
                   <DiffRow label="Описание" oldVal={originalDoc?.description} newVal={proposal.suggestedDescription} />
@@ -417,17 +510,17 @@ const ReviewModal = ({ isOpen, onClose, proposal, onProcess }) => {
                   <DiffRow label="Тип" oldVal={originalDoc?.type} newVal={proposal.suggestedType} />
                   <DiffRow label="Широта" oldVal={originalDoc?.latitude} newVal={proposal.latitude} />
                   <DiffRow label="Долгота" oldVal={originalDoc?.longitude} newVal={proposal.longitude} />
-                   {isNew && <Tr><Td colSpan={3} bg="blue.50" textAlign="center" color="gray.500">Новая точка (нет старой версии)</Td></Tr>}
+                   {isNew && <Tr><Td colSpan={3} bg="blue.50" textAlign="center" color="gray.500" py={8}>Это новая точка. Нет предыдущей версии.</Td></Tr>}
                 </Tbody>
               </Table>
             )}
           </VStack>
         </ModalBody>
-        <ModalFooter bg="gray.50">
+        <ModalFooter bg="gray.50" borderTop="1px" borderColor="gray.100">
             <HStack spacing={4}>
                 <Button variant="ghost" onClick={onClose}>Закрыть</Button>
-                <Button leftIcon={<CloseIcon />} colorScheme="red" onClick={() => onProcess(proposal.id, 'rejected')}>Отклонить</Button>
-                <Button leftIcon={<CheckIcon />} colorScheme="green" onClick={() => onProcess(proposal.id, 'approved')}>Одобрить</Button>
+                <Button leftIcon={<CloseIcon />} colorScheme="red" variant="outline" onClick={() => onProcess(proposal.id, 'rejected')}>Отклонить</Button>
+                <Button leftIcon={<CheckIcon />} colorScheme="green" onClick={() => onProcess(proposal.id, 'approved')}>Одобрить и Публиковать</Button>
             </HStack>
         </ModalFooter>
       </ModalContent>
@@ -469,24 +562,22 @@ const ModerationTable = () => {
   }
 
   return (
-    <Box p={4}>
-      <HStack justify="space-between" mb={4}>
-        <Heading size="md">Очередь Модерации ({proposals.length})</Heading>
-        <Button size="sm" onClick={fetchProposals}>Обновить</Button>
-      </HStack>
-      {loading ? <Spinner /> : proposals.length === 0 ? <Text color="gray.500">Очередь пуста.</Text> : (
-        <Table variant="simple" size="sm">
-          <Thead><Tr><Th>Название</Th><Th>Тип</Th><Th textAlign="center">Действия</Th></Tr></Thead>
+    <Box bg="white" borderRadius="xl" shadow="sm" overflow="hidden">
+      <Flex p={6} justify="space-between" align="center" borderBottom="1px" borderColor="gray.100" bg="gray.50">
+        <Heading size="md">Модерация <Badge ml={2} colorScheme="orange" borderRadius="full">{proposals.length}</Badge></Heading>
+        <Button size="sm" leftIcon={<TimeIcon />} onClick={fetchProposals}>Обновить</Button>
+      </Flex>
+      {loading ? <Flex justify="center" p={10}><Spinner /></Flex> : proposals.length === 0 ? <Flex p={10} justify="center" color="gray.500" bg="white">Очередь пуста. Вы молодец! 🎉</Flex> : (
+        <Table variant="simple">
+          <Thead bg="gray.50"><Tr><Th>Название</Th><Th>Тип</Th><Th textAlign="center">Действия</Th></Tr></Thead>
           <Tbody>
             {proposals.map(p => (
-              <Tr key={p.id}>
-                <Td fontWeight="medium">{p.suggestedName || p.suggestedNameNew || '—'}</Td>
-                <Td>{p.type === 'new_poi' ? <Tag size="sm" colorScheme="blue">Новое</Tag> : <Tag size="sm" colorScheme="orange">Правка</Tag>}</Td>
+              <Tr key={p.id} _hover={{ bg: "gray.50" }}>
+                <Td fontWeight="medium" fontSize="md">{p.suggestedName || p.suggestedNameNew || '—'}</Td>
+                <Td>{p.type === 'new_poi' ? <Tag size="sm" colorScheme="blue" variant="solid">Новое место</Tag> : <Tag size="sm" colorScheme="orange" variant="solid">Правка</Tag>}</Td>
                 <Td textAlign="center">
                   <HStack justify="center" spacing={2}>
-                    <Tooltip label="Обзор"><IconButton icon={<ViewIcon />} colorScheme="teal" size="sm" onClick={() => handleReview(p)} /></Tooltip>
-                    <IconButton icon={<CheckIcon />} colorScheme="green" variant="outline" size="sm" onClick={() => handleProcess(p.id, 'approved')} />
-                    <IconButton icon={<CloseIcon />} colorScheme="red" variant="outline" size="sm" onClick={() => handleProcess(p.id, 'rejected')} />
+                    <Button leftIcon={<ViewIcon />} colorScheme="teal" variant="ghost" size="sm" onClick={() => handleReview(p)}>Обзор</Button>
                   </HStack>
                 </Td>
               </Tr>
@@ -500,36 +591,49 @@ const ModerationTable = () => {
 };
 
 // ------------------------------------
-// 6. ГЛАВНОЕ МЕНЮ
+// 6. ГЛАВНОЕ МЕНЮ (НАВИГАЦИЯ)
 // ------------------------------------
 const AdminPanel = ({ user }) => {
   return (
-    <Box minH="100vh" bg="gray.50">
-      <Flex bg="blue.600" color="white" px={6} py={4} justify="space-between" align="center" shadow="md">
-        <Heading size="md">Guide du Détour Admin</Heading>
-        <HStack>
-          <Text fontSize="sm" opacity={0.8}>{user.email}</Text>
-          <Button size="sm" colorScheme="whiteAlpha" variant="outline" onClick={() => signOut(auth)}>Выход</Button>
+    <Box minH="100vh" bg="gray.100" fontFamily="Inter">
+      {/* Верхняя панель */}
+      <Flex bg="white" borderBottom="1px" borderColor="gray.200" px={8} py={4} justify="space-between" align="center" shadow="sm" position="sticky" top={0} zIndex={100}>
+        <HStack spacing={3}>
+           <Box bgGradient="linear(to-br, blue.500, purple.600)" w={8} h={8} borderRadius="lg" />
+           <Heading size="md" color="gray.800">Guide Admin</Heading>
+        </HStack>
+        
+        <HStack spacing={4}>
+          <HStack spacing={3} display={{ base: 'none', md: 'flex' }}>
+              <Avatar size="sm" name={user.email} src={user.photoURL} />
+              <VStack align="start" spacing={0}>
+                  <Text fontSize="sm" fontWeight="bold" color="gray.700">Администратор</Text>
+                  <Text fontSize="xs" color="gray.500">{user.email}</Text>
+              </VStack>
+          </HStack>
+          <Divider orientation="vertical" h="30px" />
+          <Button size="sm" colorScheme="gray" onClick={() => signOut(auth)}>Выход</Button>
         </HStack>
       </Flex>
       
-      <Box p={6}>
+      {/* Контент */}
+      <Container maxW="container.xl" py={8}>
         <Tabs variant="soft-rounded" colorScheme="blue" isLazy>
-          <TabList mb={6} overflowX="auto" py={1}>
-            <Tab>Главная</Tab>
-            <Tab>Пользователи</Tab>
-            <Tab>Лист ожидания</Tab>
-            <Tab>Модерация</Tab>
+          <TabList mb={6} overflowX="auto" py={2}>
+            <Tab fontWeight="bold">Главная</Tab>
+            <Tab fontWeight="bold">Пользователи</Tab>
+            <Tab fontWeight="bold">Лист ожидания</Tab>
+            <Tab fontWeight="bold">Модерация</Tab>
           </TabList>
           
           <TabPanels>
             <TabPanel px={0}><Dashboard /></TabPanel>
-            <TabPanel px={0} bg="white" p={4} borderRadius="md" shadow="sm"><UsersTable /></TabPanel>
-            <TabPanel px={0} bg="white" p={4} borderRadius="md" shadow="sm"><WaitlistTable /></TabPanel>
-            <TabPanel px={0} bg="white" p={4} borderRadius="md" shadow="sm"><ModerationTable /></TabPanel>
+            <TabPanel px={0}><UsersTable /></TabPanel>
+            <TabPanel px={0}><WaitlistTable /></TabPanel>
+            <TabPanel px={0}><ModerationTable /></TabPanel>
           </TabPanels>
         </Tabs>
-      </Box>
+      </Container>
     </Box>
   );
 };
@@ -545,10 +649,10 @@ function App() {
     });
   }, []);
 
-  if (loading) return <Flex minH="100vh" justify="center" align="center"><Spinner size="xl" color="blue.500" /></Flex>;
+  if (loading) return <Flex minH="100vh" justify="center" align="center" bg="gray.50"><Spinner size="xl" color="blue.500" thickness="4px" /></Flex>;
 
   return (
-    <ChakraProvider>
+    <ChakraProvider theme={theme}>
       {user ? <AdminPanel user={user} /> : <AuthScreen />}
     </ChakraProvider>
   );
