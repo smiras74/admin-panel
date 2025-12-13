@@ -3,12 +3,13 @@ import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: "СЮДА_ВСТАВЬ_API_KEY",
-  authDomain: "СЮДА_ВСТАВЬ_AUTH_DOMAIN",
-  projectId: "СЮДА_ВСТАВЬ_PROJECT_ID",
-  storageBucket: "СЮДА_ВСТАВЬ_STORAGE_BUCKET",
-  messagingSenderId: "СЮДА_ВСТАВЬ_SENDER_ID",
-  appId: "СЮДА_ВСТАВЬ_APP_ID"
+  apiKey: "AIzaSyCWQJtzHMksDG5UgLVma8LnYiOxYYcv_AQ",
+  authDomain: "guide-du-detour.firebaseapp.com",
+  projectId: "guide-du-detour",
+  storageBucket: "guide-du-detour.firebasestorage.app",
+  messagingSenderId: "182479723840",
+  appId: "1:182479723840:web:866963483cf1bca6f9aea5",
+  measurementId: "G-17851JKM7F"
 };
 
 const app = initializeApp(firebaseConfig);
