@@ -53,9 +53,10 @@ import {
 } from '@chakra-ui/react';
 import { 
   CopyIcon, EmailIcon, ViewIcon, CheckIcon, CloseIcon, SearchIcon, 
-  TimeIcon, StarIcon, EditIcon 
+  TimeIcon, StarIcon, EditIcon, AddIcon 
 } from '@chakra-ui/icons';
-// Импортируем иконку карты (замена внешней библиотеки)
+
+// --- ИКОНКИ ---
 const MapIcon = (props) => (
   <Icon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z" />
@@ -99,13 +100,12 @@ const theme = extendTheme({
     useSystemColorMode: false,
   },
   fonts: {
-    heading: `'Georgia', 'Times New Roman', serif`, // Шрифт с засечками как на логотипе
+    heading: `'Georgia', 'Times New Roman', serif`,
     body: `-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`,
   },
   styles: {
     global: {
       body: {
-        // Темный градиент (Deep Ocean)
         bgImage: "linear-gradient(to bottom, #0f172a, #020617)", 
         bgAttachment: "fixed",
         color: "white",
@@ -114,8 +114,7 @@ const theme = extendTheme({
   },
   colors: {
     brand: {
-        green: "#48BB78", // Зеленый акцент
-        darkGlass: "rgba(20, 25, 40, 0.6)",
+        green: "#48BB78", // Зеленый из логотипа
     }
   },
   components: {
@@ -124,7 +123,7 @@ const theme = extendTheme({
   }
 });
 
-// --- СТИЛИ ДЛЯ СТЕКЛА ---
+// --- СТИЛИ СТЕКЛА ---
 const glassStyle = {
     bg: "rgba(255, 255, 255, 0.03)", 
     backdropFilter: "blur(12px)",     
@@ -177,7 +176,6 @@ const AuthScreen = () => {
     <Flex minH="100vh" align="center" justify="center">
       <Box p={10} w="full" maxW="420px" {...glassStyle} textAlign="center">
         <VStack spacing={8}>
-          {/* ТЕКСТОВЫЙ ЛОГОТИП */}
           <Box>
              <Heading fontFamily="serif" fontSize="3xl" color="white" letterSpacing="wide" mb={1}>
                 Guide du Détour
@@ -207,7 +205,7 @@ const AuthScreen = () => {
 };
 
 // ------------------------------------
-// 2. DASHBOARD (6 КАРТОЧЕК)
+// 2. DASHBOARD
 // ------------------------------------
 const StatCard = ({ label, value, subtext, icon, color = "brand.green" }) => (
   <Box p={6} {...glassStyle} position="relative" overflow="hidden" _hover={{ bg: "rgba(255,255,255,0.06)", transform: "translateY(-2px)" }} transition="all 0.3s">
@@ -239,7 +237,7 @@ const Dashboard = () => {
     userTotal: 0, 
     userNew: 0,
     totalDistance: 0,
-    totalPois: 0,
+    totalAdded: 0,
     totalEdits: 0
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -255,8 +253,7 @@ const Dashboard = () => {
         const waitlistTotalSnap = await getCountFromServer(collection(db, COLLECTIONS.WAITLIST));
         const waitlistNewSnap = await getCountFromServer(query(collection(db, COLLECTIONS.WAITLIST), where('timestamp', '>=', yesterdayTimestamp)));
         
-        // 2. Users (и подсчет КМ)
-        // Чтобы посчитать сумму КМ, нужно получить документы (aggregate query пока в beta/limited)
+        // 2. Users (и ПРАВИЛЬНЫЙ подсчет КМ)
         const usersSnapshot = await getDocs(collection(db, COLLECTIONS.USERS));
         const userTotal = usersSnapshot.size;
         let userNew = 0;
@@ -264,22 +261,24 @@ const Dashboard = () => {
 
         usersSnapshot.forEach(doc => {
             const d = doc.data();
-            // Считаем новых
-            if (d.timestamp && d.timestamp.toMillis() >= yesterday.getTime()) {
-                userNew++;
-            }
-            // Считаем КМ (если поле называется totalDistance, иначе 0)
-            if (d.totalDistance) {
-                totalDist += Number(d.totalDistance);
-            }
+            if (d.timestamp && d.timestamp.toMillis() >= yesterday.getTime()) userNew++;
+            // ВАЖНО: Берем поле totalKm из базы
+            if (d.totalKm) totalDist += Number(d.totalKm);
         });
 
-        // 3. Всего мест (Verified POIs)
-        const poisSnap = await getCountFromServer(collection(db, COLLECTIONS.VERIFIED_POIS));
+        // 3. Добавленные места (User Added) - из Модерации
+        let totalAdded = 0;
+        try {
+            const addedQuery = query(
+                collection(db, COLLECTIONS.MODERATION_QUEUE), 
+                where('type', '==', 'new_poi'), 
+                where('status', '==', 'approved')
+            );
+            const addedSnap = await getCountFromServer(addedQuery);
+            totalAdded = addedSnap.data().count;
+        } catch (e) { console.log("Нужен индекс для new_poi", e); }
 
-        // 4. Отредактировано (Одобренные правки)
-        // Ищем в модерации записи, где type='edit_poi' и status='approved'
-        // Если индексы не настроены, этот запрос может попросить создать индекс в консоли (ссылка будет в логах)
+        // 4. Отредактированные карточки (User Edited) - из Модерации
         let totalEdits = 0;
         try {
             const editsQuery = query(
@@ -289,17 +288,15 @@ const Dashboard = () => {
             );
             const editsSnap = await getCountFromServer(editsQuery);
             totalEdits = editsSnap.data().count;
-        } catch (e) {
-            console.log("Возможно, нужен индекс для подсчета правок", e);
-        }
+        } catch (e) { console.log("Нужен индекс для edit_poi", e); }
 
         setStats({
           waitlistTotal: waitlistTotalSnap.data().count,
           waitlistNew: waitlistNewSnap.data().count,
           userTotal: userTotal,
           userNew: userNew,
-          totalDistance: Math.round(totalDist), // Округляем КМ
-          totalPois: poisSnap.data().count,
+          totalDistance: Math.round(totalDist),
+          totalAdded: totalAdded,
           totalEdits: totalEdits
         });
 
@@ -314,11 +311,11 @@ const Dashboard = () => {
     <VStack spacing={8} align="stretch">
       <Box>
         <Heading size="lg" fontWeight="normal" fontFamily="serif">Дашборд</Heading>
-        <Text color="gray.500" fontSize="sm">Обзор активности</Text>
+        <Text color="gray.500" fontSize="sm">Статистика активности</Text>
       </Box>
       <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
         
-        {/* Ряд 1: Люди */}
+        {/* Ряд 1: Люди и Очередь */}
         <StatCard 
             label="Лист ожидания" 
             value={stats.waitlistTotal} 
@@ -331,6 +328,8 @@ const Dashboard = () => {
             subtext={`+${stats.userNew} за 24ч`} 
             icon={<StarIcon boxSize={5} />} 
         />
+        
+        {/* Ряд 2: Активность (То, что вы просили) */}
         <StatCard 
             label="Общий пробег" 
             value={`${stats.totalDistance} км`} 
@@ -339,18 +338,17 @@ const Dashboard = () => {
             color="white"
         />
 
-        {/* Ряд 2: Контент */}
         <StatCard 
-            label="Всего мест" 
-            value={stats.totalPois} 
-            subtext="Активные точки на карте" 
-            icon={<MapIcon boxSize={5} />} 
+            label="Добавлено мест" 
+            value={stats.totalAdded} 
+            subtext="Одобрено модерацией" 
+            icon={<AddIcon boxSize={5} />} 
             color="white"
         />
         <StatCard 
             label="Отредактировано" 
             value={stats.totalEdits} 
-            subtext="Одобренные правки" 
+            subtext="Внесено правок" 
             icon={<EditIcon boxSize={5} />} 
             color="orange.400"
         />
@@ -419,7 +417,7 @@ const UsersTable = () => {
       {loading ? <Flex justify="center" p={10}><Spinner color="brand.green"/></Flex> : (
         <Box overflowX="auto">
         <Table variant="simple">
-          <Thead borderBottom="1px solid rgba(255,255,255,0.05)"><Tr><Th color="gray.400">Пользователь</Th><Th color="gray.400">ID</Th><Th color="gray.400">Дата</Th><Th color="gray.400">Действия</Th></Tr></Thead>
+          <Thead borderBottom="1px solid rgba(255,255,255,0.05)"><Tr><Th color="gray.400">Пользователь</Th><Th color="gray.400">ID / Info</Th><Th color="gray.400">Дата</Th><Th color="gray.400">Действия</Th></Tr></Thead>
           <Tbody>
             {filteredUsers.map((user) => (
               <Tr key={user.id} _hover={{ bg: "rgba(255,255,255,0.03)" }}>
@@ -433,7 +431,11 @@ const UsersTable = () => {
                   </HStack>
                 </Td>
                 <Td borderBottom="1px solid rgba(255,255,255,0.05)">
-                   <Tag size="sm" bg="rgba(255,255,255,0.1)" color="gray.300" fontFamily="mono">{user.id.substring(0,8)}...</Tag>
+                   <VStack align="start" spacing={0}>
+                      <Tag size="sm" bg="rgba(255,255,255,0.1)" color="gray.300" fontFamily="mono" mb={1}>{user.id.substring(0,8)}...</Tag>
+                      {/* Показываем пробег в таблице */}
+                      <Text fontSize="xs" color="brand.green">{user.totalKm ? `${user.totalKm} км` : '0 км'}</Text>
+                   </VStack>
                 </Td>
                 <Td borderBottom="1px solid rgba(255,255,255,0.05)" fontSize="sm" color="gray.400">
                   {user.timestamp?.seconds ? new Date(user.timestamp.seconds * 1000).toLocaleDateString() : '—'}
@@ -660,7 +662,7 @@ const ModerationTable = () => {
 };
 
 // ------------------------------------
-// 6. ГЛАВНОЕ МЕНЮ (NAVBAR)
+// 6. ГЛАВНОЕ МЕНЮ
 // ------------------------------------
 const AdminPanel = ({ user }) => {
   return (
@@ -677,7 +679,7 @@ const AdminPanel = ({ user }) => {
         position="sticky" top={0} zIndex={100}
       >
         <HStack spacing={4}>
-           {/* ТЕКСТОВЫЙ ЛОГОТИП В ШАПКЕ */}
+           {/* ТЕКСТОВЫЙ ЛОГОТИП */}
            <Heading fontFamily="serif" fontSize="xl" color="white" letterSpacing="wide">
               Guide du Détour
            </Heading>
