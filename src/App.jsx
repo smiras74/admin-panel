@@ -48,9 +48,28 @@ import {
   Container,
   Badge,
   extendTheme,
-  Image
+  Image,
+  Icon
 } from '@chakra-ui/react';
-import { CopyIcon, EmailIcon, ViewIcon, CheckIcon, CloseIcon, SearchIcon, TimeIcon, StarIcon } from '@chakra-ui/icons';
+import { 
+  CopyIcon, EmailIcon, ViewIcon, CheckIcon, CloseIcon, SearchIcon, 
+  TimeIcon, StarIcon, EditIcon 
+} from '@chakra-ui/icons';
+// Импортируем иконку карты (замена внешней библиотеки)
+const MapIcon = (props) => (
+  <Icon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z" />
+    <path d="M8 2v16" />
+    <path d="M16 6v16" />
+  </Icon>
+);
+const RoadIcon = (props) => (
+    <Icon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M18 19l-9-5-9 5V4l9-5 9 5v15z" opacity="0.3"/>
+      <path d="M12 2L3 7v13l9-5 9 5V7l-9-5z" />
+    </Icon>
+);
+
 
 import {
   db,
@@ -80,14 +99,14 @@ const theme = extendTheme({
     useSystemColorMode: false,
   },
   fonts: {
-    heading: `'Georgia', serif`, // Шрифт с засечками как на логотипе
+    heading: `'Georgia', 'Times New Roman', serif`, // Шрифт с засечками как на логотипе
     body: `-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`,
   },
   styles: {
     global: {
       body: {
-        // Темный градиент как на заставке приложения
-        bgImage: "linear-gradient(to bottom, #1A2639, #050505)", 
+        // Темный градиент (Deep Ocean)
+        bgImage: "linear-gradient(to bottom, #0f172a, #020617)", 
         bgAttachment: "fixed",
         color: "white",
       }
@@ -95,26 +114,22 @@ const theme = extendTheme({
   },
   colors: {
     brand: {
-        green: "#48BB78", // Зеленый акцент из логотипа
-        darkGlass: "rgba(20, 25, 40, 0.6)", // Цвет стекла
+        green: "#48BB78", // Зеленый акцент
+        darkGlass: "rgba(20, 25, 40, 0.6)",
     }
   },
   components: {
-    Button: {
-      baseStyle: { borderRadius: "12px" },
-    },
-    Input: {
-      baseStyle: { field: { borderRadius: "12px" } }
-    }
+    Button: { baseStyle: { borderRadius: "12px" } },
+    Input: { baseStyle: { field: { borderRadius: "12px" } } }
   }
 });
 
-// --- СТИЛИ ДЛЯ СТЕКЛА (Reusable Styles) ---
+// --- СТИЛИ ДЛЯ СТЕКЛА ---
 const glassStyle = {
-    bg: "rgba(255, 255, 255, 0.05)", // Очень прозрачный белый
-    backdropFilter: "blur(16px)",     // Размытие фона (iOS style)
-    border: "1px solid rgba(255, 255, 255, 0.1)", // Тонкая граница
-    boxShadow: "0 4px 30px rgba(0, 0, 0, 0.3)",
+    bg: "rgba(255, 255, 255, 0.03)", 
+    backdropFilter: "blur(12px)",     
+    border: "1px solid rgba(255, 255, 255, 0.08)", 
+    boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.4)",
     borderRadius: "20px"
 };
 
@@ -134,7 +149,7 @@ const COLLECTIONS = {
 };
 
 // ------------------------------------
-// 1. АУТЕНТИФИКАЦИЯ (DARK STYLE)
+// 1. АУТЕНТИФИКАЦИЯ
 // ------------------------------------
 const AuthScreen = () => {
   const [email, setEmail] = useState('');
@@ -162,10 +177,12 @@ const AuthScreen = () => {
     <Flex minH="100vh" align="center" justify="center">
       <Box p={10} w="full" maxW="420px" {...glassStyle} textAlign="center">
         <VStack spacing={8}>
-          {/* Логотип */}
+          {/* ТЕКСТОВЫЙ ЛОГОТИП */}
           <Box>
-             <Image src="https://i.imgur.com/8X9Y6Xj.png" alt="Guide du Détour" h="60px" mx="auto" mb={2} filter="brightness(0) invert(1)" />
-             <Text fontSize="sm" color="gray.400" letterSpacing="widest">ADMIN PANEL</Text>
+             <Heading fontFamily="serif" fontSize="3xl" color="white" letterSpacing="wide" mb={1}>
+                Guide du Détour
+             </Heading>
+             <Box h="3px" w="100px" bg="brand.green" mx="auto" borderRadius="full" boxShadow="0 0 10px #48BB78"/>
           </Box>
           
           <VStack spacing={5} w="full">
@@ -175,7 +192,7 @@ const AuthScreen = () => {
             <Button 
               size="lg" w="full" mt={4} 
               bg="brand.green" color="white"
-              _hover={{ bg: "#38A169", transform: "scale(1.02)" }}
+              _hover={{ bg: "#38A169", transform: "scale(1.02)", boxShadow: "0 0 15px rgba(72, 187, 120, 0.4)" }}
               _active={{ transform: "scale(0.98)" }}
               transition="all 0.2s"
               onClick={handleLogin} isLoading={isLoading}
@@ -190,27 +207,25 @@ const AuthScreen = () => {
 };
 
 // ------------------------------------
-// 2. DASHBOARD
+// 2. DASHBOARD (6 КАРТОЧЕК)
 // ------------------------------------
-const StatCard = ({ label, value, diff, icon }) => (
-  <Box p={6} {...glassStyle} position="relative" overflow="hidden" _hover={{ bg: "rgba(255,255,255,0.08)" }} transition="all 0.3s">
+const StatCard = ({ label, value, subtext, icon, color = "brand.green" }) => (
+  <Box p={6} {...glassStyle} position="relative" overflow="hidden" _hover={{ bg: "rgba(255,255,255,0.06)", transform: "translateY(-2px)" }} transition="all 0.3s">
     <Flex justify="space-between" align="start">
       <Stat>
         <StatLabel fontSize="xs" color="gray.400" fontWeight="bold" textTransform="uppercase" letterSpacing="wider">
           {label}
         </StatLabel>
-        <StatNumber fontSize="4xl" fontWeight="light" mt={2} color="white">
+        <StatNumber fontSize="3xl" fontWeight="light" mt={2} color="white">
           {value}
         </StatNumber>
-        {diff > 0 ? (
-          <StatHelpText mb={0} color="brand.green" fontWeight="bold">
-            <StatArrow type='increase' color="brand.green" />{diff} за 24ч
+        {subtext && (
+          <StatHelpText mb={0} color={color} fontWeight="normal" fontSize="xs">
+            {subtext}
           </StatHelpText>
-        ) : (
-          <StatHelpText mb={0} color="gray.600" fontSize="xs">Нет новых</StatHelpText>
         )}
       </Stat>
-      <Box p={3} bg="rgba(72, 187, 120, 0.15)" borderRadius="xl" color="brand.green">
+      <Box p={3} bg={`${color === 'white' ? 'gray.700' : color === 'orange.400' ? 'rgba(237, 137, 54, 0.2)' : 'rgba(72, 187, 120, 0.15)'}`} borderRadius="xl" color={color}>
         {icon}
       </Box>
     </Flex>
@@ -218,7 +233,15 @@ const StatCard = ({ label, value, diff, icon }) => (
 );
 
 const Dashboard = () => {
-  const [stats, setStats] = useState({ waitlistTotal: 0, waitlistNew: 0, userTotal: 0, userNew: 0 });
+  const [stats, setStats] = useState({ 
+    waitlistTotal: 0, 
+    waitlistNew: 0, 
+    userTotal: 0, 
+    userNew: 0,
+    totalDistance: 0,
+    totalPois: 0,
+    totalEdits: 0
+  });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -228,21 +251,56 @@ const Dashboard = () => {
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayTimestamp = Timestamp.fromDate(yesterday);
 
+        // 1. Waitlist
         const waitlistTotalSnap = await getCountFromServer(collection(db, COLLECTIONS.WAITLIST));
         const waitlistNewSnap = await getCountFromServer(query(collection(db, COLLECTIONS.WAITLIST), where('timestamp', '>=', yesterdayTimestamp)));
-        const usersTotalSnap = await getCountFromServer(collection(db, COLLECTIONS.USERS));
         
-        let userNewCount = 0;
+        // 2. Users (и подсчет КМ)
+        // Чтобы посчитать сумму КМ, нужно получить документы (aggregate query пока в beta/limited)
+        const usersSnapshot = await getDocs(collection(db, COLLECTIONS.USERS));
+        const userTotal = usersSnapshot.size;
+        let userNew = 0;
+        let totalDist = 0;
+
+        usersSnapshot.forEach(doc => {
+            const d = doc.data();
+            // Считаем новых
+            if (d.timestamp && d.timestamp.toMillis() >= yesterday.getTime()) {
+                userNew++;
+            }
+            // Считаем КМ (если поле называется totalDistance, иначе 0)
+            if (d.totalDistance) {
+                totalDist += Number(d.totalDistance);
+            }
+        });
+
+        // 3. Всего мест (Verified POIs)
+        const poisSnap = await getCountFromServer(collection(db, COLLECTIONS.VERIFIED_POIS));
+
+        // 4. Отредактировано (Одобренные правки)
+        // Ищем в модерации записи, где type='edit_poi' и status='approved'
+        // Если индексы не настроены, этот запрос может попросить создать индекс в консоли (ссылка будет в логах)
+        let totalEdits = 0;
         try {
-            const usersNewSnap = await getCountFromServer(query(collection(db, COLLECTIONS.USERS), where('timestamp', '>=', yesterdayTimestamp)));
-            userNewCount = usersNewSnap.data().count;
-        } catch (e) { }
+            const editsQuery = query(
+                collection(db, COLLECTIONS.MODERATION_QUEUE), 
+                where('type', '==', 'edit_poi'), 
+                where('status', '==', 'approved')
+            );
+            const editsSnap = await getCountFromServer(editsQuery);
+            totalEdits = editsSnap.data().count;
+        } catch (e) {
+            console.log("Возможно, нужен индекс для подсчета правок", e);
+        }
 
         setStats({
           waitlistTotal: waitlistTotalSnap.data().count,
           waitlistNew: waitlistNewSnap.data().count,
-          userTotal: usersTotalSnap.data().count,
-          userNew: userNewCount,
+          userTotal: userTotal,
+          userNew: userNew,
+          totalDistance: Math.round(totalDist), // Округляем КМ
+          totalPois: poisSnap.data().count,
+          totalEdits: totalEdits
         });
 
       } catch (e) { console.error(e); } finally { setIsLoading(false); }
@@ -255,12 +313,48 @@ const Dashboard = () => {
   return (
     <VStack spacing={8} align="stretch">
       <Box>
-        <Heading size="lg" fontWeight="normal" fontFamily="serif">Обзор</Heading>
-        <Text color="gray.500" fontSize="sm">Статистика приложения</Text>
+        <Heading size="lg" fontWeight="normal" fontFamily="serif">Дашборд</Heading>
+        <Text color="gray.500" fontSize="sm">Обзор активности</Text>
       </Box>
       <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
-        <StatCard label="Лист ожидания" value={stats.waitlistTotal} diff={stats.waitlistNew} icon={<TimeIcon boxSize={5} />} />
-        <StatCard label="Пользователи" value={stats.userTotal} diff={stats.userNew} icon={<StarIcon boxSize={5} />} />
+        
+        {/* Ряд 1: Люди */}
+        <StatCard 
+            label="Лист ожидания" 
+            value={stats.waitlistTotal} 
+            subtext={`+${stats.waitlistNew} за 24ч`} 
+            icon={<TimeIcon boxSize={5} />} 
+        />
+        <StatCard 
+            label="Пользователи" 
+            value={stats.userTotal} 
+            subtext={`+${stats.userNew} за 24ч`} 
+            icon={<StarIcon boxSize={5} />} 
+        />
+        <StatCard 
+            label="Общий пробег" 
+            value={`${stats.totalDistance} км`} 
+            subtext="Все пользователи" 
+            icon={<RoadIcon boxSize={5} />} 
+            color="white"
+        />
+
+        {/* Ряд 2: Контент */}
+        <StatCard 
+            label="Всего мест" 
+            value={stats.totalPois} 
+            subtext="Активные точки на карте" 
+            icon={<MapIcon boxSize={5} />} 
+            color="white"
+        />
+        <StatCard 
+            label="Отредактировано" 
+            value={stats.totalEdits} 
+            subtext="Одобренные правки" 
+            icon={<EditIcon boxSize={5} />} 
+            color="orange.400"
+        />
+
       </SimpleGrid>
     </VStack>
   );
@@ -583,14 +677,10 @@ const AdminPanel = ({ user }) => {
         position="sticky" top={0} zIndex={100}
       >
         <HStack spacing={4}>
-           {/* ЛОГОТИП */}
-           <Image 
-                src="https://i.imgur.com/8X9Y6Xj.png" 
-                alt="Logo" 
-                h="40px" 
-                filter="brightness(0) invert(1)" // Делаем лого белым
-            />
-            <Text fontSize="lg" fontFamily="serif" letterSpacing="wide" display={{base:'none', md:'block'}}>Admin</Text>
+           {/* ТЕКСТОВЫЙ ЛОГОТИП В ШАПКЕ */}
+           <Heading fontFamily="serif" fontSize="xl" color="white" letterSpacing="wide">
+              Guide du Détour
+           </Heading>
         </HStack>
         
         <HStack spacing={4}>
