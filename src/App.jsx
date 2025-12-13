@@ -53,7 +53,7 @@ import {
 } from '@chakra-ui/react';
 import { 
   CopyIcon, EmailIcon, ViewIcon, CheckIcon, CloseIcon, SearchIcon, 
-  TimeIcon, StarIcon, EditIcon, AddIcon 
+  TimeIcon, StarIcon, EditIcon, AddIcon, ChatIcon 
 } from '@chakra-ui/icons';
 
 // --- ИКОНКИ ---
@@ -70,7 +70,6 @@ const RoadIcon = (props) => (
       <path d="M12 2L3 7v13l9-5 9 5V7l-9-5z" />
     </Icon>
 );
-
 
 import {
   db,
@@ -144,7 +143,8 @@ const COLLECTIONS = {
   USERS: 'users',
   WAITLIST: 'waitlist',
   MODERATION_QUEUE: 'moderation_queue',
-  VERIFIED_POIS: 'verified_pois', 
+  VERIFIED_POIS: 'verified_pois',
+  REVIEWS: 'reviews' 
 };
 
 // ------------------------------------
@@ -238,7 +238,9 @@ const Dashboard = () => {
     userNew: 0,
     totalDistance: 0,
     totalAdded: 0,
-    totalEdits: 0
+    totalEdits: 0,
+    totalPois: 0,
+    totalReviews: 0 // Новое поле для отзывов
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -253,7 +255,7 @@ const Dashboard = () => {
         const waitlistTotalSnap = await getCountFromServer(collection(db, COLLECTIONS.WAITLIST));
         const waitlistNewSnap = await getCountFromServer(query(collection(db, COLLECTIONS.WAITLIST), where('timestamp', '>=', yesterdayTimestamp)));
         
-        // 2. Users (и ПРАВИЛЬНЫЙ подсчет КМ)
+        // 2. Users (и подсчет КМ)
         const usersSnapshot = await getDocs(collection(db, COLLECTIONS.USERS));
         const userTotal = usersSnapshot.size;
         let userNew = 0;
@@ -262,11 +264,19 @@ const Dashboard = () => {
         usersSnapshot.forEach(doc => {
             const d = doc.data();
             if (d.timestamp && d.timestamp.toMillis() >= yesterday.getTime()) userNew++;
-            // ВАЖНО: Берем поле totalKm из базы
             if (d.totalKm) totalDist += Number(d.totalKm);
         });
 
-        // 3. Добавленные места (User Added) - из Модерации
+        // 3. Всего мест (Verified POIs) - Читаем напрямую getDocs, чтобы точно не было 0
+        const poisSnapshot = await getDocs(collection(db, COLLECTIONS.VERIFIED_POIS));
+        const totalPoisCount = poisSnapshot.size;
+
+        // 4. Отзывы (Reviews) - Читаем напрямую getDocs
+        const reviewsSnapshot = await getDocs(collection(db, COLLECTIONS.REVIEWS));
+        const totalReviewsCount = reviewsSnapshot.size;
+
+
+        // 5. Добавленные места (User Added) - из Модерации
         let totalAdded = 0;
         try {
             const addedQuery = query(
@@ -276,9 +286,9 @@ const Dashboard = () => {
             );
             const addedSnap = await getCountFromServer(addedQuery);
             totalAdded = addedSnap.data().count;
-        } catch (e) { console.log("Нужен индекс для new_poi", e); }
+        } catch (e) { console.log("Индекс для new_poi...", e); }
 
-        // 4. Отредактированные карточки (User Edited) - из Модерации
+        // 6. Отредактированные карточки (User Edited) - из Модерации
         let totalEdits = 0;
         try {
             const editsQuery = query(
@@ -288,7 +298,7 @@ const Dashboard = () => {
             );
             const editsSnap = await getCountFromServer(editsQuery);
             totalEdits = editsSnap.data().count;
-        } catch (e) { console.log("Нужен индекс для edit_poi", e); }
+        } catch (e) { console.log("Индекс для edit_poi...", e); }
 
         setStats({
           waitlistTotal: waitlistTotalSnap.data().count,
@@ -297,7 +307,9 @@ const Dashboard = () => {
           userNew: userNew,
           totalDistance: Math.round(totalDist),
           totalAdded: totalAdded,
-          totalEdits: totalEdits
+          totalEdits: totalEdits,
+          totalPois: totalPoisCount,
+          totalReviews: totalReviewsCount
         });
 
       } catch (e) { console.error(e); } finally { setIsLoading(false); }
@@ -308,48 +320,60 @@ const Dashboard = () => {
   if (isLoading) return <Flex justify="center" p={10}><Spinner size="xl" color="brand.green" /></Flex>;
 
   return (
-    <VStack spacing={8} align="stretch">
+    <VStack spacing={10} align="stretch">
       <Box>
-        <Heading size="lg" fontWeight="normal" fontFamily="serif">Дашборд</Heading>
-        <Text color="gray.500" fontSize="sm">Статистика активности</Text>
+        {/* КРУПНЫЙ ЗАГОЛОВОК "ОБЗОР АКТИВНОСТИ" */}
+        <Heading size="2xl" fontWeight="normal" fontFamily="serif" mb={2}>
+            Обзор активности
+        </Heading>
+        <Text color="gray.500" fontSize="lg">Статистика Guide du Détour</Text>
       </Box>
-      <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
+      <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={8}>
         
         {/* Ряд 1: Люди и Очередь */}
         <StatCard 
             label="Лист ожидания" 
             value={stats.waitlistTotal} 
             subtext={`+${stats.waitlistNew} за 24ч`} 
-            icon={<TimeIcon boxSize={5} />} 
+            icon={<TimeIcon boxSize={6} />} 
         />
         <StatCard 
             label="Пользователи" 
             value={stats.userTotal} 
             subtext={`+${stats.userNew} за 24ч`} 
-            icon={<StarIcon boxSize={5} />} 
+            icon={<StarIcon boxSize={6} />} 
         />
         
-        {/* Ряд 2: Активность (То, что вы просили) */}
+        {/* Ряд 2: Контент и Отзывы */}
         <StatCard 
             label="Общий пробег" 
             value={`${stats.totalDistance} км`} 
             subtext="Все пользователи" 
-            icon={<RoadIcon boxSize={5} />} 
+            icon={<RoadIcon boxSize={6} />} 
+            color="white"
+        />
+
+         <StatCard 
+            label="Всего мест" 
+            value={stats.totalPois} 
+            subtext="Активные точки на карте" 
+            icon={<MapIcon boxSize={6} />} 
             color="white"
         />
 
         <StatCard 
-            label="Добавлено мест" 
-            value={stats.totalAdded} 
-            subtext="Одобрено модерацией" 
-            icon={<AddIcon boxSize={5} />} 
+            label="Отзывов" 
+            value={stats.totalReviews} 
+            subtext="Оставлено пользователями" 
+            icon={<ChatIcon boxSize={6} />} 
             color="white"
         />
+
         <StatCard 
-            label="Отредактировано" 
-            value={stats.totalEdits} 
-            subtext="Внесено правок" 
-            icon={<EditIcon boxSize={5} />} 
+            label="Модерация" 
+            value={stats.totalAdded + stats.totalEdits} 
+            subtext={`${stats.totalAdded} новых, ${stats.totalEdits} правок`} 
+            icon={<EditIcon boxSize={6} />} 
             color="orange.400"
         />
 
@@ -433,7 +457,6 @@ const UsersTable = () => {
                 <Td borderBottom="1px solid rgba(255,255,255,0.05)">
                    <VStack align="start" spacing={0}>
                       <Tag size="sm" bg="rgba(255,255,255,0.1)" color="gray.300" fontFamily="mono" mb={1}>{user.id.substring(0,8)}...</Tag>
-                      {/* Показываем пробег в таблице */}
                       <Text fontSize="xs" color="brand.green">{user.totalKm ? `${user.totalKm} км` : '0 км'}</Text>
                    </VStack>
                 </Td>
@@ -662,7 +685,7 @@ const ModerationTable = () => {
 };
 
 // ------------------------------------
-// 6. ГЛАВНОЕ МЕНЮ
+// 6. ГЛАВНОЕ МЕНЮ (NAVBAR)
 // ------------------------------------
 const AdminPanel = ({ user }) => {
   return (
