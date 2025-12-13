@@ -47,7 +47,8 @@ import {
   SimpleGrid,
   Container,
   Badge,
-  extendTheme
+  extendTheme,
+  Image // Импортируем компонент Image
 } from '@chakra-ui/react';
 import { CopyIcon, EmailIcon, ViewIcon, CheckIcon, CloseIcon, SearchIcon, TimeIcon, StarIcon } from '@chakra-ui/icons';
 
@@ -98,7 +99,7 @@ const COLLECTIONS = {
 };
 
 // ------------------------------------
-// 1. АУТЕНТИФИКАЦИЯ (КРАСИВЫЙ ДИЗАЙН)
+// 1. АУТЕНТИФИКАЦИЯ
 // ------------------------------------
 const AuthScreen = () => {
   const [email, setEmail] = useState('');
@@ -107,7 +108,6 @@ const AuthScreen = () => {
   const toast = useToast();
 
   const handleLogin = async () => {
-    // !!! СПИСОК АДМИНОВ !!!
     const ADMIN_EMAILS = ['7715582@mail.ru', '7715582@gmail.com'];
 
     setIsLoading(true);
@@ -140,8 +140,15 @@ const AuthScreen = () => {
       >
         <VStack spacing={6}>
           <Box textAlign="center">
-            <Heading size="xl" color="gray.700" mb={2}>Admin Panel</Heading>
-            <Text color="gray.500">Guide du Détour</Text>
+            {/* Логотип на экране входа */}
+            <Image 
+                src="https://i.imgur.com/8X9Y6Xj.png" 
+                alt="Guide du Détour" 
+                h="60px" 
+                mx="auto"
+                mb={4}
+            />
+            <Heading size="lg" color="gray.700">Вход в Админку</Heading>
           </Box>
           
           <VStack spacing={4} w="full">
@@ -176,7 +183,7 @@ const AuthScreen = () => {
               bgGradient="linear(to-r, blue.500, blue.600)"
               _hover={{ bgGradient: "linear(to-r, blue.600, blue.700)" }}
             >
-              Войти в систему
+              Войти
             </Button>
           </VStack>
         </VStack>
@@ -186,7 +193,7 @@ const AuthScreen = () => {
 };
 
 // ------------------------------------
-// 2. DASHBOARD (С КАРТОЧКАМИ)
+// 2. DASHBOARD
 // ------------------------------------
 const StatCard = ({ label, value, diff, icon }) => (
   <Box 
@@ -277,7 +284,6 @@ const Dashboard = () => {
           diff={stats.userNew} 
           icon={<StarIcon boxSize={6} />}
         />
-        {/* Можно добавить еще карточки в будущем */}
       </SimpleGrid>
     </VStack>
   );
@@ -591,16 +597,22 @@ const ModerationTable = () => {
 };
 
 // ------------------------------------
-// 6. ГЛАВНОЕ МЕНЮ (НАВИГАЦИЯ)
+// 6. ГЛАВНОЕ МЕНЮ (С ЛОГОТИПОМ)
 // ------------------------------------
 const AdminPanel = ({ user }) => {
   return (
     <Box minH="100vh" bg="gray.100" fontFamily="Inter">
       {/* Верхняя панель */}
       <Flex bg="white" borderBottom="1px" borderColor="gray.200" px={8} py={4} justify="space-between" align="center" shadow="sm" position="sticky" top={0} zIndex={100}>
-        <HStack spacing={3}>
-           <Box bgGradient="linear(to-br, blue.500, purple.600)" w={8} h={8} borderRadius="lg" />
-           <Heading size="md" color="gray.800">Guide Admin</Heading>
+        <HStack spacing={4}>
+           {/* ЛОГОТИП В ШАПКЕ */}
+           <Image 
+                src="https://i.imgur.com/8X9Y6Xj.png" 
+                alt="Guide du Détour Logo" 
+                h="40px" 
+                htmlWidth="auto"
+                objectFit="contain"
+            />
         </HStack>
         
         <HStack spacing={4}>
@@ -641,6 +653,11 @@ const AdminPanel = ({ user }) => {
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Устанавливаем название вкладки браузера
+  useEffect(() => {
+    document.title = "Guide Du Detour Admin";
+  }, []);
 
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
