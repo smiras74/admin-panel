@@ -22,7 +22,6 @@ import {
   StatLabel,
   StatNumber,
   StatHelpText,
-  StatArrow,
   Table,
   Thead,
   Tbody,
@@ -48,7 +47,6 @@ import {
   Container,
   Badge,
   extendTheme,
-  Image,
   Icon
 } from '@chakra-ui/react';
 import { 
@@ -88,7 +86,6 @@ import {
   where,
   updateDoc,
   doc,
-  getCountFromServer,
   Timestamp
 } from 'firebase/firestore';
 
@@ -113,7 +110,7 @@ const theme = extendTheme({
   },
   colors: {
     brand: {
-        green: "#48BB78", // Зеленый из логотипа
+        green: "#48BB78",
     }
   },
   components: {
@@ -240,111 +237,116 @@ const Dashboard = () => {
     totalAdded: 0,
     totalEdits: 0,
     totalPois: 0,
-    totalReviews: 0 // Новое поле для отзывов
+    totalReviews: 0
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayTimestamp = Timestamp.fromDate(yesterday);
+  const fetchStats = async () => {
+    setIsLoading(true);
+    try {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
 
-        // 1. Waitlist
-        const waitlistTotalSnap = await getCountFromServer(collection(db, COLLECTIONS.WAITLIST));
-        const waitlistNewSnap = await getCountFromServer(query(collection(db, COLLECTIONS.WAITLIST), where('timestamp', '>=', yesterdayTimestamp)));
-        
-        // 2. Users (и подсчет КМ)
-        const usersSnapshot = await getDocs(collection(db, COLLECTIONS.USERS));
-        const userTotal = usersSnapshot.size;
-        let userNew = 0;
-        let totalDist = 0;
+      // --- 1. WAITLIST (ИСПРАВЛЕНО: проверяем и timestamp, и date) ---
+      const waitlistSnapshot = await getDocs(collection(db, COLLECTIONS.WAITLIST));
+      const waitlistTotal = waitlistSnapshot.size;
+      let waitlistNew = 0;
+      
+      waitlistSnapshot.forEach(doc => {
+          const d = doc.data();
+          // "Всеядная" проверка времени
+          const timeField = d.timestamp || d.date;
+          if (timeField && timeField.seconds && timeField.toMillis() >= yesterday.getTime()) {
+              waitlistNew++;
+          }
+      });
 
-        usersSnapshot.forEach(doc => {
-            const d = doc.data();
-            if (d.timestamp && d.timestamp.toMillis() >= yesterday.getTime()) userNew++;
-            if (d.totalKm) totalDist += Number(d.totalKm);
-        });
+      // --- 2. USERS (КМ + Новые) ---
+      const usersSnapshot = await getDocs(collection(db, COLLECTIONS.USERS));
+      const userTotal = usersSnapshot.size;
+      let userNew = 0;
+      let totalDist = 0;
 
-        // 3. Всего мест (Verified POIs) - Читаем напрямую getDocs, чтобы точно не было 0
-        const poisSnapshot = await getDocs(collection(db, COLLECTIONS.VERIFIED_POIS));
-        const totalPoisCount = poisSnapshot.size;
+      usersSnapshot.forEach(doc => {
+          const d = doc.data();
+          if (d.timestamp && d.timestamp.toMillis() >= yesterday.getTime()) userNew++;
+          if (d.totalKm) totalDist += Number(d.totalKm);
+      });
 
-        // 4. Отзывы (Reviews) - Читаем напрямую getDocs
-        const reviewsSnapshot = await getDocs(collection(db, COLLECTIONS.REVIEWS));
-        const totalReviewsCount = reviewsSnapshot.size;
+      // --- 3. POIs (Прямой подсчет) ---
+      const poisSnapshot = await getDocs(collection(db, COLLECTIONS.VERIFIED_POIS));
+      const totalPoisCount = poisSnapshot.size;
 
+      // --- 4. Reviews (Прямой подсчет) ---
+      const reviewsSnapshot = await getDocs(collection(db, COLLECTIONS.REVIEWS));
+      const totalReviewsCount = reviewsSnapshot.size;
 
-        // 5. Добавленные места (User Added) - из Модерации
-        let totalAdded = 0;
-        try {
-            const addedQuery = query(
-                collection(db, COLLECTIONS.MODERATION_QUEUE), 
-                where('type', '==', 'new_poi'), 
-                where('status', '==', 'approved')
-            );
-            const addedSnap = await getCountFromServer(addedQuery);
-            totalAdded = addedSnap.data().count;
-        } catch (e) { console.log("Индекс для new_poi...", e); }
+      // --- 5. Moderation (New & Edits) ---
+      let totalAdded = 0;
+      let totalEdits = 0;
+      const modSnapshot = await getDocs(collection(db, COLLECTIONS.MODERATION_QUEUE));
+      modSnapshot.forEach(doc => {
+          const d = doc.data();
+          if (d.status === 'approved') {
+              if (d.type === 'new_poi') totalAdded++;
+              if (d.type === 'edit_poi') totalEdits++;
+          }
+      });
 
-        // 6. Отредактированные карточки (User Edited) - из Модерации
-        let totalEdits = 0;
-        try {
-            const editsQuery = query(
-                collection(db, COLLECTIONS.MODERATION_QUEUE), 
-                where('type', '==', 'edit_poi'), 
-                where('status', '==', 'approved')
-            );
-            const editsSnap = await getCountFromServer(editsQuery);
-            totalEdits = editsSnap.data().count;
-        } catch (e) { console.log("Индекс для edit_poi...", e); }
+      setStats({
+        waitlistTotal: waitlistTotal,
+        waitlistNew: waitlistNew,
+        userTotal: userTotal,
+        userNew: userNew,
+        totalDistance: Math.round(totalDist),
+        totalAdded: totalAdded,
+        totalEdits: totalEdits,
+        totalPois: totalPoisCount,
+        totalReviews: totalReviewsCount
+      });
 
-        setStats({
-          waitlistTotal: waitlistTotalSnap.data().count,
-          waitlistNew: waitlistNewSnap.data().count,
-          userTotal: userTotal,
-          userNew: userNew,
-          totalDistance: Math.round(totalDist),
-          totalAdded: totalAdded,
-          totalEdits: totalEdits,
-          totalPois: totalPoisCount,
-          totalReviews: totalReviewsCount
-        });
+    } catch (e) { console.error(e); } finally { setIsLoading(false); }
+  };
 
-      } catch (e) { console.error(e); } finally { setIsLoading(false); }
-    };
-    fetchStats();
-  }, []);
+  useEffect(() => { fetchStats(); }, []);
 
   if (isLoading) return <Flex justify="center" p={10}><Spinner size="xl" color="brand.green" /></Flex>;
 
   return (
     <VStack spacing={10} align="stretch">
-      <Box>
-        {/* КРУПНЫЙ ЗАГОЛОВОК "ОБЗОР АКТИВНОСТИ" */}
-        <Heading size="2xl" fontWeight="normal" fontFamily="serif" mb={2}>
-            Обзор активности
-        </Heading>
-        <Text color="gray.500" fontSize="lg">Статистика Guide du Détour</Text>
-      </Box>
+      <Flex justify="space-between" align="center">
+        <Box>
+            <Heading size="2xl" fontWeight="normal" fontFamily="serif" mb={2}>
+                Обзор активности
+            </Heading>
+            <Text color="gray.500" fontSize="lg">Статистика Guide du Détour</Text>
+        </Box>
+        <IconButton 
+            icon={<TimeIcon />} 
+            onClick={fetchStats} 
+            size="lg" 
+            variant="outline" 
+            colorScheme="whiteAlpha" 
+            aria-label="Refresh"
+            _hover={{ bg: "whiteAlpha.200" }}
+        />
+      </Flex>
+
       <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={8}>
         
-        {/* Ряд 1: Люди и Очередь */}
         <StatCard 
             label="Лист ожидания" 
             value={stats.waitlistTotal} 
-            subtext={`+${stats.waitlistNew} за 24ч`} 
+            subtext={stats.waitlistNew > 0 ? `+${stats.waitlistNew} за 24ч` : "Нет новых"} 
             icon={<TimeIcon boxSize={6} />} 
         />
         <StatCard 
             label="Пользователи" 
             value={stats.userTotal} 
-            subtext={`+${stats.userNew} за 24ч`} 
+            subtext={stats.userNew > 0 ? `+${stats.userNew} за 24ч` : "Нет новых"} 
             icon={<StarIcon boxSize={6} />} 
         />
         
-        {/* Ряд 2: Контент и Отзывы */}
         <StatCard 
             label="Общий пробег" 
             value={`${stats.totalDistance} км`} 
@@ -491,7 +493,12 @@ const WaitlistTable = () => {
       const q = query(collection(db, COLLECTIONS.WAITLIST));
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      data.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+      // Сортировка с учетом обоих полей (timestamp или date)
+      data.sort((a, b) => {
+          const dateA = a.timestamp?.seconds || a.date?.seconds || 0;
+          const dateB = b.timestamp?.seconds || b.date?.seconds || 0;
+          return dateB - dateA;
+      });
       setList(data);
     } catch (error) { toast({ status: 'error', title: 'Ошибка загрузки' }); } finally { setLoading(false); }
   };
@@ -514,11 +521,14 @@ const WaitlistTable = () => {
         <Table variant="simple">
           <Thead borderBottom="1px solid rgba(255,255,255,0.05)"><Tr><Th color="gray.400">Email</Th><Th color="gray.400">Дата</Th><Th color="gray.400">Действия</Th></Tr></Thead>
           <Tbody>
-            {list.map((item) => (
+            {list.map((item) => {
+              // Определяем какое поле с датой использовать
+              const timeField = item.timestamp || item.date;
+              return (
               <Tr key={item.id} _hover={{ bg: "rgba(255,255,255,0.03)" }}>
                 <Td borderBottom="1px solid rgba(255,255,255,0.05)" fontWeight="bold">{item.email}</Td>
                 <Td borderBottom="1px solid rgba(255,255,255,0.05)" fontSize="sm" color="gray.400">
-                  {item.timestamp?.seconds ? new Date(item.timestamp.seconds * 1000).toLocaleString('ru-RU') : '—'}
+                  {timeField?.seconds ? new Date(timeField.seconds * 1000).toLocaleString('ru-RU') : '—'}
                 </Td>
                 <Td borderBottom="1px solid rgba(255,255,255,0.05)">
                   <HStack spacing={2}>
@@ -527,7 +537,7 @@ const WaitlistTable = () => {
                   </HStack>
                 </Td>
               </Tr>
-            ))}
+            )})}
           </Tbody>
         </Table>
         </Box>
