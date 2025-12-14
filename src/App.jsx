@@ -12,11 +12,6 @@ import {
   Button,
   Input,
   useToast,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
   Spinner,
   Stat,
   StatLabel,
@@ -51,7 +46,7 @@ import {
 } from '@chakra-ui/react';
 import { 
   CopyIcon, EmailIcon, ViewIcon, CheckIcon, CloseIcon, SearchIcon, 
-  TimeIcon, StarIcon, EditIcon, AddIcon, ChatIcon 
+  TimeIcon, StarIcon, EditIcon, AddIcon, ChatIcon, ArrowBackIcon 
 } from '@chakra-ui/icons';
 
 // --- ИКОНКИ ---
@@ -86,6 +81,7 @@ import {
   where,
   updateDoc,
   doc,
+  getCountFromServer,
   Timestamp
 } from 'firebase/firestore';
 
@@ -204,8 +200,19 @@ const AuthScreen = () => {
 // ------------------------------------
 // 2. DASHBOARD
 // ------------------------------------
-const StatCard = ({ label, value, subtext, icon, color = "brand.green" }) => (
-  <Box p={6} {...glassStyle} position="relative" overflow="hidden" _hover={{ bg: "rgba(255,255,255,0.06)", transform: "translateY(-2px)" }} transition="all 0.3s">
+const StatCard = ({ label, value, subtext, icon, color = "brand.green", onClick }) => (
+  <Box 
+    p={6} 
+    {...glassStyle} 
+    position="relative" 
+    overflow="hidden" 
+    // Стили для кликабельности
+    cursor={onClick ? "pointer" : "default"}
+    _hover={onClick ? { bg: "rgba(255,255,255,0.08)", transform: "translateY(-4px)", boxShadow: "0 12px 40px rgba(0,0,0,0.5)" } : {}}
+    _active={onClick ? { transform: "scale(0.98)" } : {}}
+    transition="all 0.3s"
+    onClick={onClick}
+  >
     <Flex justify="space-between" align="start">
       <Stat>
         <StatLabel fontSize="xs" color="gray.400" fontWeight="bold" textTransform="uppercase" letterSpacing="wider">
@@ -227,17 +234,13 @@ const StatCard = ({ label, value, subtext, icon, color = "brand.green" }) => (
   </Box>
 );
 
-const Dashboard = () => {
+const Dashboard = ({ onNavigate }) => {
   const [stats, setStats] = useState({ 
-    waitlistTotal: 0, 
-    waitlistNew: 0, 
-    userTotal: 0, 
-    userNew: 0,
+    waitlistTotal: 0, waitlistNew: 0, 
+    userTotal: 0, userNew: 0,
     totalDistance: 0,
-    totalAdded: 0,
-    totalEdits: 0,
-    totalPois: 0,
-    totalReviews: 0
+    totalAdded: 0, totalEdits: 0,
+    totalPois: 0, totalReviews: 0
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -247,41 +250,36 @@ const Dashboard = () => {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
 
-      // --- 1. WAITLIST (ИСПРАВЛЕНО: проверяем и timestamp, и date) ---
+      // 1. Waitlist
       const waitlistSnapshot = await getDocs(collection(db, COLLECTIONS.WAITLIST));
       const waitlistTotal = waitlistSnapshot.size;
       let waitlistNew = 0;
-      
       waitlistSnapshot.forEach(doc => {
           const d = doc.data();
-          // "Всеядная" проверка времени
           const timeField = d.timestamp || d.date;
-          if (timeField && timeField.seconds && timeField.toMillis() >= yesterday.getTime()) {
-              waitlistNew++;
-          }
+          if (timeField && timeField.seconds && timeField.toMillis() >= yesterday.getTime()) waitlistNew++;
       });
 
-      // --- 2. USERS (КМ + Новые) ---
+      // 2. Users
       const usersSnapshot = await getDocs(collection(db, COLLECTIONS.USERS));
       const userTotal = usersSnapshot.size;
       let userNew = 0;
       let totalDist = 0;
-
       usersSnapshot.forEach(doc => {
           const d = doc.data();
           if (d.timestamp && d.timestamp.toMillis() >= yesterday.getTime()) userNew++;
           if (d.totalKm) totalDist += Number(d.totalKm);
       });
 
-      // --- 3. POIs (Прямой подсчет) ---
+      // 3. POIs
       const poisSnapshot = await getDocs(collection(db, COLLECTIONS.VERIFIED_POIS));
       const totalPoisCount = poisSnapshot.size;
 
-      // --- 4. Reviews (Прямой подсчет) ---
+      // 4. Reviews
       const reviewsSnapshot = await getDocs(collection(db, COLLECTIONS.REVIEWS));
       const totalReviewsCount = reviewsSnapshot.size;
 
-      // --- 5. Moderation (New & Edits) ---
+      // 5. Moderation
       let totalAdded = 0;
       let totalEdits = 0;
       const modSnapshot = await getDocs(collection(db, COLLECTIONS.MODERATION_QUEUE));
@@ -294,17 +292,13 @@ const Dashboard = () => {
       });
 
       setStats({
-        waitlistTotal: waitlistTotal,
-        waitlistNew: waitlistNew,
-        userTotal: userTotal,
-        userNew: userNew,
+        waitlistTotal, waitlistNew,
+        userTotal, userNew,
         totalDistance: Math.round(totalDist),
-        totalAdded: totalAdded,
-        totalEdits: totalEdits,
+        totalAdded, totalEdits,
         totalPois: totalPoisCount,
         totalReviews: totalReviewsCount
       });
-
     } catch (e) { console.error(e); } finally { setIsLoading(false); }
   };
 
@@ -322,31 +316,29 @@ const Dashboard = () => {
             <Text color="gray.500" fontSize="lg">Статистика Guide du Détour</Text>
         </Box>
         <IconButton 
-            icon={<TimeIcon />} 
-            onClick={fetchStats} 
-            size="lg" 
-            variant="outline" 
-            colorScheme="whiteAlpha" 
-            aria-label="Refresh"
-            _hover={{ bg: "whiteAlpha.200" }}
+            icon={<TimeIcon />} onClick={fetchStats} size="lg" variant="outline" colorScheme="whiteAlpha" aria-label="Refresh" _hover={{ bg: "whiteAlpha.200" }}
         />
       </Flex>
 
       <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={8}>
         
+        {/* КЛИКАБЕЛЬНЫЕ КАРТОЧКИ - НАВИГАЦИЯ */}
         <StatCard 
             label="Лист ожидания" 
             value={stats.waitlistTotal} 
             subtext={stats.waitlistNew > 0 ? `+${stats.waitlistNew} за 24ч` : "Нет новых"} 
             icon={<TimeIcon boxSize={6} />} 
+            onClick={() => onNavigate('waitlist')}
         />
         <StatCard 
             label="Пользователи" 
             value={stats.userTotal} 
             subtext={stats.userNew > 0 ? `+${stats.userNew} за 24ч` : "Нет новых"} 
             icon={<StarIcon boxSize={6} />} 
+            onClick={() => onNavigate('users')}
         />
         
+        {/* Информационные карточки */}
         <StatCard 
             label="Общий пробег" 
             value={`${stats.totalDistance} км`} 
@@ -354,7 +346,6 @@ const Dashboard = () => {
             icon={<RoadIcon boxSize={6} />} 
             color="white"
         />
-
          <StatCard 
             label="Всего мест" 
             value={stats.totalPois} 
@@ -362,7 +353,6 @@ const Dashboard = () => {
             icon={<MapIcon boxSize={6} />} 
             color="white"
         />
-
         <StatCard 
             label="Отзывов" 
             value={stats.totalReviews} 
@@ -370,55 +360,50 @@ const Dashboard = () => {
             icon={<ChatIcon boxSize={6} />} 
             color="white"
         />
-
         <StatCard 
             label="Модерация" 
             value={stats.totalAdded + stats.totalEdits} 
             subtext={`${stats.totalAdded} новых, ${stats.totalEdits} правок`} 
             icon={<EditIcon boxSize={6} />} 
             color="orange.400"
+            onClick={() => onNavigate('moderation')}
         />
-
       </SimpleGrid>
     </VStack>
   );
 };
 
 // ------------------------------------
-// 3. ТАБЛИЦА ПОЛЬЗОВАТЕЛЕЙ
+// 3. ТАБЛИЦА ПОЛЬЗОВАТЕЛЕЙ (С КНОПКОЙ НАЗАД)
 // ------------------------------------
-const UsersTable = () => {
+const UsersTable = ({ onBack }) => {
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const toast = useToast();
 
-  const fetchUsers = async () => {
-    setLoading(true);
-    try {
-      const q = query(collection(db, COLLECTIONS.USERS));
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setUsers(data);
-      setFilteredUsers(data);
-    } catch (error) { toast({ status: 'error', title: 'Ошибка загрузки' }); } finally { setLoading(false); }
-  };
-
-  useEffect(() => { fetchUsers(); }, []);
+  useEffect(() => {
+    const fetch = async () => {
+        try {
+            const snap = await getDocs(query(collection(db, COLLECTIONS.USERS)));
+            const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setUsers(data); setFilteredUsers(data);
+        } catch (e) { toast({ status: 'error', title: 'Ошибка' }); } finally { setLoading(false); }
+    };
+    fetch();
+  }, []);
 
   useEffect(() => {
-    if (!search) {
-      setFilteredUsers(users);
-    } else {
-      const lowerSearch = search.toLowerCase();
-      const filtered = users.filter(user => 
-        (user.email && user.email.toLowerCase().includes(lowerSearch)) ||
-        (user.displayName && user.displayName.toLowerCase().includes(lowerSearch)) ||
-        (user.name && user.name.toLowerCase().includes(lowerSearch)) ||
-        user.id.includes(lowerSearch)
-      );
-      setFilteredUsers(filtered);
+    if (!search) setFilteredUsers(users);
+    else {
+      const lower = search.toLowerCase();
+      setFilteredUsers(users.filter(u => 
+        (u.email && u.email.toLowerCase().includes(lower)) ||
+        (u.displayName && u.displayName.toLowerCase().includes(lower)) ||
+        (u.name && u.name.toLowerCase().includes(lower)) ||
+        u.id.includes(lower)
+      ));
     }
   }, [search, users]);
 
@@ -430,14 +415,15 @@ const UsersTable = () => {
   return (
     <Box {...glassStyle} overflow="hidden">
       <Flex p={6} justify="space-between" align="center" borderBottom="1px solid rgba(255,255,255,0.05)">
-        <Heading size="md" fontFamily="serif">Пользователи <Badge ml={2} bg="brand.green" color="white" borderRadius="full">{users.length}</Badge></Heading>
         <HStack>
-            <InputGroup size="sm" w="250px">
-                <InputLeftElement pointerEvents='none'><SearchIcon color='gray.500' /></InputLeftElement>
-                <Input placeholder="Поиск..." {...glassInputStyle} value={search} onChange={(e) => setSearch(e.target.value)} />
-            </InputGroup>
-            <IconButton icon={<TimeIcon />} onClick={fetchUsers} size="sm" variant="outline" colorScheme="whiteAlpha" aria-label="Refresh" />
+            {/* КНОПКА НАЗАД */}
+            <IconButton icon={<ArrowBackIcon />} onClick={onBack} variant="ghost" color="white" aria-label="Back" mr={2} _hover={{bg:'whiteAlpha.200'}} />
+            <Heading size="md" fontFamily="serif">Пользователи <Badge ml={2} bg="brand.green" color="white" borderRadius="full">{users.length}</Badge></Heading>
         </HStack>
+        <InputGroup size="sm" w="200px">
+            <InputLeftElement pointerEvents='none'><SearchIcon color='gray.500' /></InputLeftElement>
+            <Input placeholder="Поиск..." {...glassInputStyle} value={search} onChange={(e) => setSearch(e.target.value)} />
+        </InputGroup>
       </Flex>
       
       {loading ? <Flex justify="center" p={10}><Spinner color="brand.green"/></Flex> : (
@@ -480,30 +466,28 @@ const UsersTable = () => {
 
 
 // ------------------------------------
-// 4. ТАБЛИЦА ЛИСТА ОЖИДАНИЯ
+// 4. ТАБЛИЦА ЛИСТА ОЖИДАНИЯ (С КНОПКОЙ НАЗАД)
 // ------------------------------------
-const WaitlistTable = () => {
+const WaitlistTable = ({ onBack }) => {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
 
-  const fetchWaitlist = async () => {
-    setLoading(true);
-    try {
-      const q = query(collection(db, COLLECTIONS.WAITLIST));
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Сортировка с учетом обоих полей (timestamp или date)
-      data.sort((a, b) => {
-          const dateA = a.timestamp?.seconds || a.date?.seconds || 0;
-          const dateB = b.timestamp?.seconds || b.date?.seconds || 0;
-          return dateB - dateA;
-      });
-      setList(data);
-    } catch (error) { toast({ status: 'error', title: 'Ошибка загрузки' }); } finally { setLoading(false); }
-  };
-
-  useEffect(() => { fetchWaitlist(); }, []);
+  useEffect(() => {
+    const fetch = async () => {
+        try {
+            const snap = await getDocs(query(collection(db, COLLECTIONS.WAITLIST)));
+            const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            data.sort((a, b) => {
+                const dateA = a.timestamp?.seconds || a.date?.seconds || 0;
+                const dateB = b.timestamp?.seconds || b.date?.seconds || 0;
+                return dateB - dateA;
+            });
+            setList(data);
+        } catch (e) { toast({ status: 'error', title: 'Ошибка' }); } finally { setLoading(false); }
+    };
+    fetch();
+  }, []);
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
@@ -513,8 +497,10 @@ const WaitlistTable = () => {
   return (
     <Box {...glassStyle} overflow="hidden">
       <Flex p={6} justify="space-between" align="center" borderBottom="1px solid rgba(255,255,255,0.05)">
-        <Heading size="md" fontFamily="serif">Waitlist <Badge ml={2} bg="brand.green" color="white" borderRadius="full">{list.length}</Badge></Heading>
-        <IconButton icon={<TimeIcon />} onClick={fetchWaitlist} size="sm" variant="outline" colorScheme="whiteAlpha" />
+        <HStack>
+             <IconButton icon={<ArrowBackIcon />} onClick={onBack} variant="ghost" color="white" aria-label="Back" mr={2} _hover={{bg:'whiteAlpha.200'}} />
+             <Heading size="md" fontFamily="serif">Waitlist <Badge ml={2} bg="brand.green" color="white" borderRadius="full">{list.length}</Badge></Heading>
+        </HStack>
       </Flex>
       {loading ? <Flex justify="center" p={10}><Spinner color="brand.green"/></Flex> : (
         <Box overflowX="auto">
@@ -522,7 +508,6 @@ const WaitlistTable = () => {
           <Thead borderBottom="1px solid rgba(255,255,255,0.05)"><Tr><Th color="gray.400">Email</Th><Th color="gray.400">Дата</Th><Th color="gray.400">Действия</Th></Tr></Thead>
           <Tbody>
             {list.map((item) => {
-              // Определяем какое поле с датой использовать
               const timeField = item.timestamp || item.date;
               return (
               <Tr key={item.id} _hover={{ bg: "rgba(255,255,255,0.03)" }}>
@@ -547,7 +532,7 @@ const WaitlistTable = () => {
 };
 
 // =================================================================
-// 5. МОДЕРАЦИЯ И СРАВНЕНИЕ
+// 5. МОДЕРАЦИЯ (С КНОПКОЙ НАЗАД)
 // =================================================================
 
 const DiffRow = ({ label, oldVal, newVal }) => {
@@ -605,7 +590,6 @@ const ReviewModal = ({ isOpen, onClose, proposal, onProcess }) => {
                     <Box><Text fontSize="xs" color="gray.500">ID Автора</Text><Text fontSize="sm" fontFamily="mono">{proposal.userId}</Text></Box>
                 </SimpleGrid>
             </Box>
-            
             {loadingOriginal ? <Flex w="full" justify="center" p={10}><Spinner color="brand.green" /></Flex> : (
               <Table variant="simple" size="md">
                 <Thead><Tr><Th color="gray.400">Поле</Th><Th color="gray.400">Было</Th><Th color="gray.400">Стало</Th></Tr></Thead>
@@ -634,7 +618,7 @@ const ReviewModal = ({ isOpen, onClose, proposal, onProcess }) => {
   );
 };
 
-const ModerationTable = () => {
+const ModerationTable = ({ onBack }) => {
   const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState(null);
@@ -670,8 +654,10 @@ const ModerationTable = () => {
   return (
     <Box {...glassStyle} overflow="hidden">
       <Flex p={6} justify="space-between" align="center" borderBottom="1px solid rgba(255,255,255,0.05)">
-        <Heading size="md" fontFamily="serif">Модерация <Badge ml={2} bg="orange.400" color="white" borderRadius="full">{proposals.length}</Badge></Heading>
-        <IconButton icon={<TimeIcon />} onClick={fetchProposals} size="sm" variant="outline" colorScheme="whiteAlpha" />
+        <HStack>
+            <IconButton icon={<ArrowBackIcon />} onClick={onBack} variant="ghost" color="white" aria-label="Back" mr={2} _hover={{bg:'whiteAlpha.200'}} />
+            <Heading size="md" fontFamily="serif">Модерация <Badge ml={2} bg="orange.400" color="white" borderRadius="full">{proposals.length}</Badge></Heading>
+        </HStack>
       </Flex>
       {loading ? <Flex justify="center" p={10}><Spinner color="brand.green" /></Flex> : proposals.length === 0 ? <Flex p={10} justify="center" color="gray.500">Очередь пуста.</Flex> : (
         <Table variant="simple">
@@ -695,9 +681,12 @@ const ModerationTable = () => {
 };
 
 // ------------------------------------
-// 6. ГЛАВНОЕ МЕНЮ (NAVBAR)
+// 6. ГЛАВНОЕ МЕНЮ (SPA NAVIGATION)
 // ------------------------------------
 const AdminPanel = ({ user }) => {
+  // Состояние навигации: 'dashboard', 'users', 'waitlist', 'moderation'
+  const [currentView, setCurrentView] = useState('dashboard');
+
   return (
     <Box minH="100vh" fontFamily="body">
       {/* Шапка */}
@@ -712,7 +701,6 @@ const AdminPanel = ({ user }) => {
         position="sticky" top={0} zIndex={100}
       >
         <HStack spacing={4}>
-           {/* ТЕКСТОВЫЙ ЛОГОТИП */}
            <Heading fontFamily="serif" fontSize="xl" color="white" letterSpacing="wide">
               Guide du Détour
            </Heading>
@@ -730,29 +718,12 @@ const AdminPanel = ({ user }) => {
         </HStack>
       </Flex>
       
-      {/* Контент */}
+      {/* Контент: меняется в зависимости от currentView */}
       <Container maxW="container.xl" py={8}>
-        <Tabs variant="soft-rounded" colorScheme="green" isLazy>
-          <TabList mb={6} overflowX="auto" py={2} borderBottom="none">
-            {['Главная', 'Пользователи', 'Лист ожидания', 'Модерация'].map(tab => (
-                <Tab 
-                    key={tab} 
-                    color="gray.400" 
-                    _selected={{ color: 'white', bg: 'rgba(72, 187, 120, 0.2)' }}
-                    _hover={{ color: 'white' }}
-                >
-                    {tab}
-                </Tab>
-            ))}
-          </TabList>
-          
-          <TabPanels>
-            <TabPanel px={0}><Dashboard /></TabPanel>
-            <TabPanel px={0}><UsersTable /></TabPanel>
-            <TabPanel px={0}><WaitlistTable /></TabPanel>
-            <TabPanel px={0}><ModerationTable /></TabPanel>
-          </TabPanels>
-        </Tabs>
+        {currentView === 'dashboard' && <Dashboard onNavigate={setCurrentView} />}
+        {currentView === 'users' && <UsersTable onBack={() => setCurrentView('dashboard')} />}
+        {currentView === 'waitlist' && <WaitlistTable onBack={() => setCurrentView('dashboard')} />}
+        {currentView === 'moderation' && <ModerationTable onBack={() => setCurrentView('dashboard')} />}
       </Container>
     </Box>
   );
