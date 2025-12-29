@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   MapPin,
@@ -70,7 +70,7 @@ interface PendingReview {
 
 type Tab = 'pois' | 'edits' | 'reviews';
 
-export default function ModerationPage() {
+function ModerationContent() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -199,16 +199,16 @@ export default function ModerationPage() {
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
                     activeTab === tab.id
-                      ? 'bg-forest-900 text-forest-300 border border-forest-700'
-                      : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
+                      ? 'bg-forest-600 text-white'
+                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
-                  {tab.label}
+                  <span>{tab.label}</span>
                   {tab.count > 0 && (
-                    <span className={`px-1.5 py-0.5 text-xs rounded-full ${
-                      activeTab === tab.id 
-                        ? 'bg-forest-700 text-forest-200' 
+                    <span className={`px-2 py-0.5 rounded-full text-xs ${
+                      activeTab === tab.id
+                        ? 'bg-forest-500 text-white'
                         : 'bg-gray-700 text-gray-300'
                     }`}>
                       {tab.count}
@@ -221,141 +221,91 @@ export default function ModerationPage() {
 
           {/* Content */}
           {loading ? (
-            <div className="space-y-4">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="bg-gray-800 rounded-xl p-4 animate-pulse">
-                  <div className="h-4 bg-gray-700 rounded w-1/3 mb-2"></div>
-                  <div className="h-3 bg-gray-700 rounded w-1/2"></div>
-                </div>
-              ))}
+            <div className="flex justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-forest-500" />
             </div>
           ) : (
             <>
-              {/* New POIs Tab */}
+              {/* POIs Tab */}
               {activeTab === 'pois' && (
                 <div className="space-y-4">
                   {pois.length === 0 ? (
                     <div className="text-center py-12">
                       <MapPin className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-                      <p className="text-gray-400">Aucun POI en attente</p>
+                      <p className="text-gray-400">Aucun nouveau POI en attente</p>
                     </div>
                   ) : (
                     pois.map(poi => (
                       <div 
                         key={poi.id} 
-                        className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden"
+                        className="bg-gray-800 rounded-xl border border-gray-700 p-4"
                       >
-                        <div 
-                          className="p-4 cursor-pointer hover:bg-gray-750"
-                          onClick={() => setExpandedItem(expandedItem === poi.id ? null : poi.id)}
-                        >
-                          <div className="flex items-start gap-4">
-                            {/* Photo */}
-                            <div className="w-16 h-16 rounded-lg bg-gray-700 overflow-hidden shrink-0">
-                              {poi.photoUrls && poi.photoUrls[0] ? (
-                                <img src={poi.photoUrls[0]} alt="" className="w-full h-full object-cover" />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <ImageIcon className="w-6 h-6 text-gray-600" />
-                                </div>
+                        <div className="flex items-start gap-4">
+                          {/* Thumbnail */}
+                          {poi.photoUrls && poi.photoUrls.length > 0 ? (
+                            <img 
+                              src={poi.photoUrls[0]} 
+                              alt={poi.name}
+                              className="w-16 h-16 object-cover rounded-lg shrink-0"
+                            />
+                          ) : (
+                            <div className="w-16 h-16 rounded-lg bg-gray-700 flex items-center justify-center shrink-0">
+                              <MapPin className="w-6 h-6 text-gray-500" />
+                            </div>
+                          )}
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="px-2 py-0.5 bg-green-900 text-green-300 text-xs rounded-full">
+                                Nouveau POI
+                              </span>
+                              {poi.category && (
+                                <span className="text-gray-500 text-sm">{poi.category}</span>
                               )}
                             </div>
-
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="px-2 py-0.5 bg-green-900 text-green-300 text-xs rounded-full">
-                                  Nouveau POI
-                                </span>
-                              </div>
-                              <h3 className="font-medium text-gray-100 mt-1">{poi.name}</h3>
-                              <p className="text-sm text-gray-400 line-clamp-1">{poi.description || 'Pas de description'}</p>
-                              
-                              <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                                {poi.category && (
-                                  <span>{poi.category}</span>
-                                )}
+                            <h3 className="font-medium text-gray-100 truncate">{poi.name}</h3>
+                            {poi.description && (
+                              <p className="text-gray-400 text-sm mt-1 line-clamp-2">{poi.description}</p>
+                            )}
+                            <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                              <span className="flex items-center gap-1">
+                                <User className="w-3 h-3" />
+                                {poi.userId || 'Anonyme'}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {formatDate(poi.createdAt)}
+                              </span>
+                              {poi.photoUrls && poi.photoUrls.length > 0 && (
                                 <span className="flex items-center gap-1">
-                                  <Clock className="w-3 h-3" />
-                                  {formatDate(poi.createdAt)}
+                                  <ImageIcon className="w-3 h-3" />
+                                  {poi.photoUrls.length} photo{poi.photoUrls.length > 1 ? 's' : ''}
                                 </span>
-                              </div>
+                              )}
                             </div>
+                          </div>
 
-                            <ChevronRight className={`w-5 h-5 text-gray-500 transition-transform ${expandedItem === poi.id ? 'rotate-90' : ''}`} />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleAction(poi.id, 'new_poi', 'approve')}
+                              disabled={processing === poi.id}
+                              className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                            >
+                              {processing === poi.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Check className="w-4 h-4" />
+                              )}
+                            </button>
+                            <button
+                              onClick={() => handleAction(poi.id, 'new_poi', 'reject')}
+                              disabled={processing === poi.id}
+                              className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
                           </div>
                         </div>
-
-                        {/* Expanded Details */}
-                        {expandedItem === poi.id && (
-                          <div className="border-t border-gray-700 p-4 bg-gray-850">
-                            <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-                              <div>
-                                <span className="text-gray-500">Catégorie:</span>
-                                <span className="ml-2 text-gray-300">{poi.category || '—'}</span>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">Sous-catégorie:</span>
-                                <span className="ml-2 text-gray-300">{poi.subcategory || '—'}</span>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">Coordonnées:</span>
-                                <a 
-                                  href={`https://www.google.com/maps?q=${poi.latitude},${poi.longitude}`}
-                                  target="_blank"
-                                  className="ml-2 text-forest-400 hover:text-forest-300"
-                                >
-                                  {poi.latitude?.toFixed(5)}, {poi.longitude?.toFixed(5)}
-                                  <ExternalLink className="w-3 h-3 inline ml-1" />
-                                </a>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">Utilisateur:</span>
-                                <span className="ml-2 text-gray-300">{poi.userId || '—'}</span>
-                              </div>
-                            </div>
-
-                            {poi.description && (
-                              <div className="mb-4">
-                                <span className="text-gray-500 text-sm">Description:</span>
-                                <p className="mt-1 text-gray-300 text-sm">{poi.description}</p>
-                              </div>
-                            )}
-
-                            {poi.photoUrls && poi.photoUrls.length > 0 && (
-                              <div className="mb-4">
-                                <span className="text-gray-500 text-sm">Photos ({poi.photoUrls.length}):</span>
-                                <div className="flex gap-2 mt-2">
-                                  {poi.photoUrls.map((url, i) => (
-                                    <img key={i} src={url} alt="" className="w-20 h-20 object-cover rounded-lg" />
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            <div className="flex gap-2 pt-4 border-t border-gray-700">
-                              <button
-                                onClick={() => handleAction(poi.id, 'new_poi', 'approve')}
-                                disabled={processing === poi.id}
-                                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                              >
-                                {processing === poi.id ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <Check className="w-4 h-4" />
-                                )}
-                                Approuver
-                              </button>
-                              <button
-                                onClick={() => handleAction(poi.id, 'new_poi', 'reject')}
-                                disabled={processing === poi.id}
-                                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-                              >
-                                <X className="w-4 h-4" />
-                                Rejeter
-                              </button>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     ))
                   )}
@@ -376,44 +326,44 @@ export default function ModerationPage() {
                         key={edit.id} 
                         className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden"
                       >
-                        <div 
-                          className="p-4 cursor-pointer hover:bg-gray-750"
+                        {/* Header */}
+                        <button
                           onClick={() => setExpandedItem(expandedItem === edit.id ? null : edit.id)}
+                          className="w-full p-4 flex items-center gap-4 hover:bg-gray-750 transition-all"
                         >
-                          <div className="flex items-start gap-4">
-                            <div className="w-10 h-10 rounded-lg bg-purple-900 flex items-center justify-center shrink-0">
-                              <Edit3 className="w-5 h-5 text-purple-400" />
-                            </div>
-
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="px-2 py-0.5 bg-purple-900 text-purple-300 text-xs rounded-full">
-                                  Modification
-                                </span>
-                              </div>
-                              <h3 className="font-medium text-gray-100 mt-1">{edit.poiName}</h3>
-                              
-                              <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                                <span className="flex items-center gap-1">
-                                  <User className="w-3 h-3" />
-                                  {edit.userId || 'Anonyme'}
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <Clock className="w-3 h-3" />
-                                  {formatDate(edit.createdAt)}
-                                </span>
-                              </div>
-                            </div>
-
-                            <ChevronRight className={`w-5 h-5 text-gray-500 transition-transform ${expandedItem === edit.id ? 'rotate-90' : ''}`} />
+                          <div className="w-10 h-10 rounded-lg bg-amber-900 flex items-center justify-center shrink-0">
+                            <Edit3 className="w-5 h-5 text-amber-400" />
                           </div>
-                        </div>
 
-                        {/* Expanded Diff View */}
+                          <div className="flex-1 text-left">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="px-2 py-0.5 bg-amber-900 text-amber-300 text-xs rounded-full">
+                                Modification
+                              </span>
+                            </div>
+                            <h3 className="font-medium text-gray-100">{edit.poiName}</h3>
+                            <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
+                              <span className="flex items-center gap-1">
+                                <User className="w-3 h-3" />
+                                {edit.userId || 'Anonyme'}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {formatDate(edit.createdAt)}
+                              </span>
+                            </div>
+                          </div>
+
+                          <ChevronRight className={`w-5 h-5 text-gray-500 transition-transform ${
+                            expandedItem === edit.id ? 'rotate-90' : ''
+                          }`} />
+                        </button>
+
+                        {/* Expanded Content */}
                         {expandedItem === edit.id && (
-                          <div className="border-t border-gray-700 p-4 bg-gray-850">
+                          <div className="p-4 border-t border-gray-700 bg-gray-850">
                             {/* Name Diff */}
-                            {edit.changes.name !== undefined && edit.changes.name !== edit.original?.name && (
+                            {edit.changes.name && (
                               <div className="mb-4">
                                 <span className="text-gray-500 text-sm font-medium">Nom:</span>
                                 <div className="mt-1 grid grid-cols-2 gap-2">
@@ -430,7 +380,7 @@ export default function ModerationPage() {
                             )}
 
                             {/* Description Diff */}
-                            {edit.changes.description !== undefined && edit.changes.description !== edit.original?.description && (
+                            {edit.changes.description && (
                               <div className="mb-4">
                                 <span className="text-gray-500 text-sm font-medium">Description:</span>
                                 <div className="mt-1 grid grid-cols-2 gap-2">
@@ -625,5 +575,17 @@ export default function ModerationPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function ModerationPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <Loader2 className="w-8 h-8 animate-spin text-forest-500" />
+      </div>
+    }>
+      <ModerationContent />
+    </Suspense>
   );
 }
