@@ -114,8 +114,8 @@ export default function WaitlistPage() {
       
       <main className="md:ml-64 pt-14 md:pt-0 pb-20 md:pb-6">
         <div className="px-4 sm:px-6 lg:px-8 py-6">
-          {/* Header */}
-          <div className="flex items-start justify-between mb-6">
+          {/* Header - Stack on mobile */}
+          <div className="flex flex-col gap-4 mb-6">
             <div>
               <h1 className="text-2xl font-semibold text-gray-100">Waitlist</h1>
               <p className="text-gray-400 mt-1">
@@ -123,21 +123,23 @@ export default function WaitlistPage() {
               </p>
             </div>
             
-            <div className="flex gap-2">
+            {/* Buttons - Horizontal scroll on mobile */}
+            <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible">
               <button
                 onClick={copyAllEmails}
                 disabled={entries.length === 0}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 hover:bg-gray-750 disabled:opacity-50"
+                className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-xs sm:text-sm text-gray-300 hover:bg-gray-750 disabled:opacity-50 whitespace-nowrap shrink-0"
               >
                 {copiedAll ? (
                   <>
                     <Check className="w-4 h-4 text-green-400" />
-                    Copié!
+                    <span className="hidden sm:inline">Copié!</span>
                   </>
                 ) : (
                   <>
                     <Copy className="w-4 h-4" />
-                    Copier tous les emails
+                    <span className="hidden sm:inline">Copier tous les emails</span>
+                    <span className="sm:hidden">Copier</span>
                   </>
                 )}
               </button>
@@ -145,7 +147,7 @@ export default function WaitlistPage() {
               <button
                 onClick={downloadCSV}
                 disabled={entries.length === 0}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 hover:bg-gray-750 disabled:opacity-50"
+                className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-xs sm:text-sm text-gray-300 hover:bg-gray-750 disabled:opacity-50 whitespace-nowrap shrink-0"
               >
                 <Download className="w-4 h-4" />
                 CSV
@@ -155,10 +157,11 @@ export default function WaitlistPage() {
                 href="https://www.kisskissbankbank.com/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-4 py-2 bg-forest-600 rounded-lg text-sm text-white hover:bg-forest-700"
+                className="flex items-center gap-2 px-3 py-2 bg-forest-600 rounded-lg text-xs sm:text-sm text-white hover:bg-forest-700 whitespace-nowrap shrink-0"
               >
                 <ExternalLink className="w-4 h-4" />
-                KissKissBankBank
+                <span className="hidden sm:inline">KissKissBankBank</span>
+                <span className="sm:hidden">KKB</span>
               </a>
             </div>
           </div>
@@ -185,12 +188,56 @@ export default function WaitlistPage() {
             </div>
           ) : (
             <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-              <table className="w-full">
+              {/* Mobile: Card view */}
+              <div className="sm:hidden divide-y divide-gray-700">
+                {entries.map((entry) => (
+                  <div key={entry.id} className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-gray-100 font-medium truncate">{getDisplayName(entry)}</p>
+                        <p className="text-gray-400 text-sm truncate">{entry.email}</p>
+                        {entry.createdAt && (
+                          <p className="text-gray-500 text-xs mt-1">
+                            {new Date(entry.createdAt).toLocaleDateString('fr-FR', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric'
+                            })}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => copyEmail(entry.email, entry.id)}
+                          className="p-2 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-700"
+                          title="Copier l'email"
+                        >
+                          {copiedId === entry.id ? (
+                            <Check className="w-4 h-4 text-green-400" />
+                          ) : (
+                            <Copy className="w-4 h-4" />
+                          )}
+                        </button>
+                        <a
+                          href={`mailto:${entry.email}`}
+                          className="p-2 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-700"
+                          title="Envoyer un email"
+                        >
+                          <Mail className="w-4 h-4" />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop: Table view */}
+              <table className="w-full hidden sm:table">
                 <thead>
                   <tr className="border-b border-gray-700">
                     <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">Nom</th>
                     <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">Email</th>
-                    <th className="text-left px-4 py-3 text-sm font-medium text-gray-400 hidden sm:table-cell">Date</th>
+                    <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">Date</th>
                     <th className="px-4 py-3 text-sm font-medium text-gray-400 w-24">Actions</th>
                   </tr>
                 </thead>
@@ -203,7 +250,7 @@ export default function WaitlistPage() {
                       <td className="px-4 py-3">
                         <span className="text-gray-300">{entry.email}</span>
                       </td>
-                      <td className="px-4 py-3 hidden sm:table-cell">
+                      <td className="px-4 py-3">
                         <span className="text-sm text-gray-500">
                           {entry.createdAt 
                             ? new Date(entry.createdAt).toLocaleDateString('fr-FR', {

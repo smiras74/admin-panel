@@ -132,7 +132,6 @@ function ModerationContent() {
       });
 
       if (response.ok) {
-        // Remove from list
         if (type === 'new_poi') {
           setPois(prev => prev.filter(p => p.id !== id));
         } else if (type === 'edit') {
@@ -168,9 +167,9 @@ function ModerationContent() {
   }
 
   const tabs = [
-    { id: 'pois' as Tab, label: 'Nouveaux POI', count: pois.length, icon: MapPin },
-    { id: 'edits' as Tab, label: 'Modifications', count: edits.length, icon: Edit3 },
-    { id: 'reviews' as Tab, label: 'Commentaires', count: reviews.length, icon: MessageSquare },
+    { id: 'pois' as Tab, label: 'Nouveaux POI', shortLabel: 'POI', count: pois.length, icon: MapPin },
+    { id: 'edits' as Tab, label: 'Modifications', shortLabel: 'Modifs', count: edits.length, icon: Edit3 },
+    { id: 'reviews' as Tab, label: 'Commentaires', shortLabel: 'Avis', count: reviews.length, icon: MessageSquare },
   ];
 
   const totalPending = pois.length + edits.length + reviews.length;
@@ -189,24 +188,27 @@ function ModerationContent() {
             </p>
           </div>
 
-          {/* Tabs */}
-          <div className="flex gap-2 mb-6 border-b border-gray-700 pb-4">
+          {/* Tabs - Scrollable on mobile */}
+          <div className="flex gap-2 mb-6 border-b border-gray-700 pb-4 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible">
             {tabs.map(tab => {
               const Icon = tab.icon;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                  className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg transition-all whitespace-nowrap shrink-0 ${
                     activeTab === tab.id
                       ? 'bg-forest-600 text-white'
                       : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
-                  <span>{tab.label}</span>
+                  <span className="text-sm sm:text-base">
+                    <span className="sm:hidden">{tab.shortLabel}</span>
+                    <span className="hidden sm:inline">{tab.label}</span>
+                  </span>
                   {tab.count > 0 && (
-                    <span className={`px-2 py-0.5 rounded-full text-xs ${
+                    <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-xs ${
                       activeTab === tab.id
                         ? 'bg-forest-500 text-white'
                         : 'bg-gray-700 text-gray-300'
@@ -240,22 +242,21 @@ function ModerationContent() {
                         key={poi.id} 
                         className="bg-gray-800 rounded-xl border border-gray-700 p-4"
                       >
-                        <div className="flex items-start gap-4">
-                          {/* Thumbnail */}
+                        <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                           {poi.photoUrls && poi.photoUrls.length > 0 ? (
                             <img 
                               src={poi.photoUrls[0]} 
                               alt={poi.name}
-                              className="w-16 h-16 object-cover rounded-lg shrink-0"
+                              className="w-full sm:w-16 h-32 sm:h-16 object-cover rounded-lg shrink-0"
                             />
                           ) : (
-                            <div className="w-16 h-16 rounded-lg bg-gray-700 flex items-center justify-center shrink-0">
+                            <div className="w-full sm:w-16 h-32 sm:h-16 rounded-lg bg-gray-700 flex items-center justify-center shrink-0">
                               <MapPin className="w-6 h-6 text-gray-500" />
                             </div>
                           )}
 
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
                               <span className="px-2 py-0.5 bg-green-900 text-green-300 text-xs rounded-full">
                                 Nouveau POI
                               </span>
@@ -267,7 +268,7 @@ function ModerationContent() {
                             {poi.description && (
                               <p className="text-gray-400 text-sm mt-1 line-clamp-2">{poi.description}</p>
                             )}
-                            <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                            <div className="flex items-center gap-3 sm:gap-4 mt-2 text-xs text-gray-500 flex-wrap">
                               <span className="flex items-center gap-1">
                                 <User className="w-3 h-3" />
                                 {poi.userId || 'Anonyme'}
@@ -276,33 +277,29 @@ function ModerationContent() {
                                 <Clock className="w-3 h-3" />
                                 {formatDate(poi.createdAt)}
                               </span>
-                              {poi.photoUrls && poi.photoUrls.length > 0 && (
-                                <span className="flex items-center gap-1">
-                                  <ImageIcon className="w-3 h-3" />
-                                  {poi.photoUrls.length} photo{poi.photoUrls.length > 1 ? 's' : ''}
-                                </span>
-                              )}
                             </div>
                           </div>
 
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 mt-3 sm:mt-0">
                             <button
                               onClick={() => handleAction(poi.id, 'new_poi', 'approve')}
                               disabled={processing === poi.id}
-                              className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
                             >
                               {processing === poi.id ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
                               ) : (
                                 <Check className="w-4 h-4" />
                               )}
+                              <span className="sm:hidden">Approuver</span>
                             </button>
                             <button
                               onClick={() => handleAction(poi.id, 'new_poi', 'reject')}
                               disabled={processing === poi.id}
-                              className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
                             >
                               <X className="w-4 h-4" />
+                              <span className="sm:hidden">Rejeter</span>
                             </button>
                           </div>
                         </div>
@@ -326,47 +323,32 @@ function ModerationContent() {
                         key={edit.id} 
                         className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden"
                       >
-                        {/* Header */}
                         <button
                           onClick={() => setExpandedItem(expandedItem === edit.id ? null : edit.id)}
-                          className="w-full p-4 flex items-center gap-4 hover:bg-gray-750 transition-all"
+                          className="w-full p-4 flex items-center gap-3 sm:gap-4 hover:bg-gray-750 transition-all"
                         >
                           <div className="w-10 h-10 rounded-lg bg-amber-900 flex items-center justify-center shrink-0">
                             <Edit3 className="w-5 h-5 text-amber-400" />
                           </div>
 
-                          <div className="flex-1 text-left">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="px-2 py-0.5 bg-amber-900 text-amber-300 text-xs rounded-full">
-                                Modification
-                              </span>
-                            </div>
-                            <h3 className="font-medium text-gray-100">{edit.poiName}</h3>
-                            <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
-                              <span className="flex items-center gap-1">
-                                <User className="w-3 h-3" />
-                                {edit.userId || 'Anonyme'}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {formatDate(edit.createdAt)}
-                              </span>
-                            </div>
+                          <div className="flex-1 text-left min-w-0">
+                            <span className="px-2 py-0.5 bg-amber-900 text-amber-300 text-xs rounded-full">
+                              Modification
+                            </span>
+                            <h3 className="font-medium text-gray-100 truncate mt-1">{edit.poiName}</h3>
                           </div>
 
-                          <ChevronRight className={`w-5 h-5 text-gray-500 transition-transform ${
+                          <ChevronRight className={`w-5 h-5 text-gray-500 transition-transform shrink-0 ${
                             expandedItem === edit.id ? 'rotate-90' : ''
                           }`} />
                         </button>
 
-                        {/* Expanded Content */}
                         {expandedItem === edit.id && (
                           <div className="p-4 border-t border-gray-700 bg-gray-850">
-                            {/* Name Diff */}
                             {edit.changes.name && (
                               <div className="mb-4">
                                 <span className="text-gray-500 text-sm font-medium">Nom:</span>
-                                <div className="mt-1 grid grid-cols-2 gap-2">
+                                <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
                                   <div className="p-2 bg-red-900/30 border border-red-800 rounded-lg">
                                     <span className="text-xs text-red-400 block mb-1">Avant</span>
                                     <span className="text-gray-300">{edit.original?.name || '—'}</span>
@@ -379,11 +361,10 @@ function ModerationContent() {
                               </div>
                             )}
 
-                            {/* Description Diff */}
                             {edit.changes.description && (
                               <div className="mb-4">
                                 <span className="text-gray-500 text-sm font-medium">Description:</span>
-                                <div className="mt-1 grid grid-cols-2 gap-2">
+                                <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
                                   <div className="p-2 bg-red-900/30 border border-red-800 rounded-lg">
                                     <span className="text-xs text-red-400 block mb-1">Avant</span>
                                     <span className="text-gray-300 text-sm">{edit.original?.description || '—'}</span>
@@ -396,33 +377,7 @@ function ModerationContent() {
                               </div>
                             )}
 
-                            {/* Photos Diff */}
-                            {edit.changes.photoUrls !== undefined && (
-                              <div className="mb-4">
-                                <span className="text-gray-500 text-sm font-medium">Photos:</span>
-                                <div className="mt-1 grid grid-cols-2 gap-2">
-                                  <div className="p-2 bg-red-900/30 border border-red-800 rounded-lg">
-                                    <span className="text-xs text-red-400 block mb-1">Avant ({edit.original?.photoUrls?.length || 0})</span>
-                                    <div className="flex gap-1 flex-wrap">
-                                      {edit.original?.photoUrls?.map((url, i) => (
-                                        <img key={i} src={url} alt="" className="w-12 h-12 object-cover rounded" />
-                                      )) || <span className="text-gray-500 text-sm">Aucune photo</span>}
-                                    </div>
-                                  </div>
-                                  <div className="p-2 bg-green-900/30 border border-green-800 rounded-lg">
-                                    <span className="text-xs text-green-400 block mb-1">Après ({edit.changes.photoUrls?.length || 0})</span>
-                                    <div className="flex gap-1 flex-wrap">
-                                      {edit.changes.photoUrls?.map((url, i) => (
-                                        <img key={i} src={url} alt="" className="w-12 h-12 object-cover rounded" />
-                                      )) || <span className="text-gray-500 text-sm">Aucune photo</span>}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* No Changes */}
-                            {!edit.changes.name && !edit.changes.description && !edit.changes.photoUrls && (
+                            {!edit.changes.name && !edit.changes.description && (
                               <div className="flex items-center gap-2 text-gray-500 mb-4">
                                 <AlertCircle className="w-4 h-4" />
                                 <span>Aucun changement détecté</span>
@@ -437,7 +392,7 @@ function ModerationContent() {
                                   changes: edit.changes,
                                 })}
                                 disabled={processing === edit.id}
-                                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
                               >
                                 {processing === edit.id ? (
                                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -449,7 +404,7 @@ function ModerationContent() {
                               <button
                                 onClick={() => handleAction(edit.id, 'edit', 'reject')}
                                 disabled={processing === edit.id}
-                                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
                               >
                                 <X className="w-4 h-4" />
                                 Rejeter
@@ -477,13 +432,13 @@ function ModerationContent() {
                         key={review.id} 
                         className="bg-gray-800 rounded-xl border border-gray-700 p-4"
                       >
-                        <div className="flex items-start gap-4">
+                        <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                           <div className="w-10 h-10 rounded-lg bg-blue-900 flex items-center justify-center shrink-0">
                             <MessageSquare className="w-5 h-5 text-blue-400" />
                           </div>
 
                           <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
                               <span className="px-2 py-0.5 bg-blue-900 text-blue-300 text-xs rounded-full">
                                 Commentaire
                               </span>
@@ -504,64 +459,28 @@ function ModerationContent() {
                             )}
                             
                             <p className="text-gray-300">{review.comment || 'Pas de commentaire'}</p>
-                            
-                            {/* Photos */}
-                            {review.photoUrls && review.photoUrls.length > 0 && (
-                              <div className="flex gap-2 mt-3 flex-wrap">
-                                {review.photoUrls.map((url, i) => (
-                                  <a 
-                                    key={i} 
-                                    href={url} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="block"
-                                  >
-                                    <img 
-                                      src={url} 
-                                      alt={`Photo ${i + 1}`} 
-                                      className="w-20 h-20 object-cover rounded-lg border border-gray-700 hover:border-gray-500 transition-all" 
-                                    />
-                                  </a>
-                                ))}
-                              </div>
-                            )}
-                            
-                            <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
-                              <span className="flex items-center gap-1">
-                                <User className="w-3 h-3" />
-                                {review.userId || 'Anonyme'}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {formatDate(review.createdAt)}
-                              </span>
-                              {review.photoUrls && review.photoUrls.length > 0 && (
-                                <span className="flex items-center gap-1">
-                                  <ImageIcon className="w-3 h-3" />
-                                  {review.photoUrls.length} photo{review.photoUrls.length > 1 ? 's' : ''}
-                                </span>
-                              )}
-                            </div>
                           </div>
 
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 mt-3 sm:mt-0">
                             <button
                               onClick={() => handleAction(review.id, 'review', 'approve')}
                               disabled={processing === review.id}
-                              className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
                             >
                               {processing === review.id ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
                               ) : (
                                 <Check className="w-4 h-4" />
                               )}
+                              <span className="sm:hidden">Approuver</span>
                             </button>
                             <button
                               onClick={() => handleAction(review.id, 'review', 'reject')}
                               disabled={processing === review.id}
-                              className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
                             >
                               <X className="w-4 h-4" />
+                              <span className="sm:hidden">Rejeter</span>
                             </button>
                           </div>
                         </div>
