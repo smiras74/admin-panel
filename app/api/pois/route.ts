@@ -7,137 +7,127 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     
     const search = searchParams.get('search')?.toLowerCase() || '';
-    const source = searchParams.get('source') || 'all';
+    const status = searchParams.get('status') || 'all'; // 'all', 'verified', 'cached', 'pending'
     const category = searchParams.get('category') || 'all';
     const subcategory = searchParams.get('subcategory') || 'all';
-    const contentFilter = searchParams.get('content') || 'all'; // 'all', 'with-photo', 'with-description', 'complete', 'empty'
+    const contentFilter = searchParams.get('content') || 'all';
     const sortBy = searchParams.get('sortBy') || 'name';
     const sortOrder = searchParams.get('sortOrder') || 'asc';
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    // Get counts
-    const [verifiedCount, cachedCount, customCount] = await Promise.all([
-      db.collection('verified_pois').count().get(),
-      db.collection('cached_pois').count().get(),
-      db.collection('custom_pois').count().get(),
+    // Get counts by status from unified collection
+    const poisCollection = db.collection('pois');
+    
+    const [totalCount, verifiedCount, cachedCount, pendingCount] = await Promise.all([
+      poisCollection.count().get(),
+      poisCollection.where('status', '==', 'verified').count().get(),
+      poisCollection.where('status', '==', 'cached').count().get(),
+      poisCollection.where('status', '==', 'pending').count().get(),
     ]);
 
     const counts = {
+      total: totalCount.data().count,
       verified: verifiedCount.data().count,
       cached: cachedCount.data().count,
-      custom: customCount.data().count,
+      pending: pendingCount.data().count,
     };
 
-    // Determine which collections to query
-    const collections: { name: string; sourceValue: string }[] = [];
+    // Build query
+    let query = poisCollection.limit(500);
     
-    if (source === 'all' || source === 'verified') {
-      collections.push({ name: 'verified_pois', sourceValue: 'verified' });
+    // Apply status filter
+    if (status !== 'all') {
+      query = query.where('status', '==', status);
     }
-    if (source === 'all' || source === 'cached') {
-      collections.push({ name: 'cached_pois', sourceValue: 'osm' });
-    }
-    if (source === 'all' || source === 'custom') {
-      collections.push({ name: 'custom_pois', sourceValue: 'ugc' });
+    
+    // Apply category filter
+    if (category !== 'all') {
+      query = query.where('category', '==', category);
     }
 
-    // Fetch from each collection
+    const snapshot = await query.get();
+    
+    // Process documents
     const allPois: any[] = [];
     const seenIds = new Set<string>();
     const seenCoordinates = new Map<string, string>();
     const allSubcategories = new Set<string>();
     
-    for (const col of collections) {
-      let query = db.collection(col.name).limit(500); // Get more for filtering
+    snapshot.docs.forEach(doc => {
+      const data = doc.data();
       
-      // Apply category filter if specified
-      if (category !== 'all') {
-        query = query.where('category', '==', category);
+      if (seenIds.has(doc.id)) return;
+      
+      // Apply search filter
+      if (search && !data.name?.toLowerCase().includes(search)) return;
+
+      // Apply subcategory filter
+      if (subcategory !== 'all' && data.subcategory !== subcategory) return;
+      
+      // Get coordinates
+      let lat: number | undefined;
+      let lon: number | undefined;
+      
+      if (data.coordinate) {
+        lat = data.coordinate.latitude || data.coordinate._latitude;
+        lon = data.coordinate.longitude || data.coordinate._longitude;
+      } else if (data.latitude !== undefined && data.longitude !== undefined) {
+        lat = data.latitude;
+        lon = data.longitude;
       }
       
-      const snapshot = await query.get();
+      // Deduplicate by coordinates
+      if (lat !== undefined && lon !== undefined) {
+        const coordKey = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+        if (seenCoordinates.has(coordKey)) return;
+        seenCoordinates.set(coordKey, doc.id);
+      }
       
-      snapshot.docs.forEach(doc => {
-        const data = doc.data();
-        
-        // Skip if already seen this ID
-        if (seenIds.has(doc.id)) {
-          return;
-        }
-        
-        // Apply search filter
-        if (search && !data.name?.toLowerCase().includes(search)) {
-          return;
-        }
+      // Photo and description checks
+      const photoUrls = data.photoUrls || (data.photoUrl ? [data.photoUrl] : []);
+      const hasPhoto = photoUrls.length > 0;
+      const hasDescription = !!data.description && data.description.trim().length > 0;
 
-        // Apply subcategory filter
-        if (subcategory !== 'all' && data.subcategory !== subcategory) {
-          return;
-        }
-        
-        // Get coordinates for deduplication
-        let lat: number | undefined;
-        let lon: number | undefined;
-        
-        if (data.coordinate) {
-          lat = data.coordinate.latitude || data.coordinate._latitude;
-          lon = data.coordinate.longitude || data.coordinate._longitude;
-        } else if (data.latitude !== undefined && data.longitude !== undefined) {
-          lat = data.latitude;
-          lon = data.longitude;
-        }
-        
-        // Check for coordinate-based duplicates
-        if (lat !== undefined && lon !== undefined) {
-          const coordKey = `${lat.toFixed(4)},${lon.toFixed(4)}`;
-          
-          if (seenCoordinates.has(coordKey)) {
-            return;
-          }
-          
-          seenCoordinates.set(coordKey, doc.id);
-        }
-        
-        // Determine if has photo and description
-        const photoUrls = data.photoUrls || (data.photoUrl ? [data.photoUrl] : []);
-        const hasPhoto = photoUrls.length > 0;
-        const hasDescription = !!data.description && data.description.trim().length > 0;
-
-        // Apply content filter
-        if (contentFilter === 'with-photo' && !hasPhoto) return;
-        if (contentFilter === 'with-description' && !hasDescription) return;
-        if (contentFilter === 'complete' && (!hasPhoto || !hasDescription)) return;
-        if (contentFilter === 'empty' && (hasPhoto || hasDescription)) return;
-        
-        seenIds.add(doc.id);
-        
-        // Collect subcategories
-        if (data.subcategory) {
-          allSubcategories.add(data.subcategory);
-        }
-        
-        allPois.push({
-          id: doc.id,
-          name: data.name || 'Sans nom',
-          description: data.description,
-          category: data.category,
-          subcategory: data.subcategory,
-          latitude: lat,
-          longitude: lon,
-          photoUrls: photoUrls,
-          hasPhoto,
-          hasDescription,
-          averageRating: data.averageRating,
-          ratingCount: data.ratingCount || 0,
-          checkInCount: data.checkInCount || 0,
-          source: col.sourceValue,
-          status: data.status,
-          createdAt: data.createdAt?.toDate?.() || null,
-          cachedAt: data.cachedAt?.toDate?.() || null,
-        });
+      // Apply content filter
+      if (contentFilter === 'with-photo' && !hasPhoto) return;
+      if (contentFilter === 'with-description' && !hasDescription) return;
+      if (contentFilter === 'complete' && (!hasPhoto || !hasDescription)) return;
+      if (contentFilter === 'empty' && (hasPhoto || hasDescription)) return;
+      
+      seenIds.add(doc.id);
+      
+      if (data.subcategory) {
+        allSubcategories.add(data.subcategory);
+      }
+      
+      // Map status to source for backward compatibility with UI
+      const sourceFromStatus = {
+        'verified': 'verified',
+        'cached': 'osm',
+        'pending': 'ugc',
+      }[data.status] || 'osm';
+      
+      allPois.push({
+        id: doc.id,
+        name: data.name || 'Sans nom',
+        description: data.description,
+        category: data.category,
+        subcategory: data.subcategory,
+        latitude: lat,
+        longitude: lon,
+        photoUrls: photoUrls,
+        hasPhoto,
+        hasDescription,
+        averageRating: data.averageRating,
+        ratingCount: data.ratingCount || 0,
+        checkInCount: data.checkInCount || 0,
+        source: sourceFromStatus,
+        status: data.status,
+        createdAt: data.createdAt?.toDate?.() || null,
+        cachedAt: data.cachedAt?.toDate?.() || null,
       });
-    }
+    });
 
     // Sort
     allPois.sort((a, b) => {
@@ -166,8 +156,8 @@ export async function GET(request: NextRequest) {
     });
 
     // Pagination
-    const totalCount = allPois.length;
-    const totalPages = Math.ceil(totalCount / limit);
+    const totalPoisCount = allPois.length;
+    const totalPages = Math.ceil(totalPoisCount / limit);
     const startIndex = (page - 1) * limit;
     const pois = allPois.slice(startIndex, startIndex + limit);
 
@@ -187,7 +177,7 @@ export async function GET(request: NextRequest) {
       pagination: {
         page,
         limit,
-        totalCount,
+        totalCount: totalPoisCount,
         totalPages,
         hasNext: page < totalPages,
         hasPrev: page > 1,

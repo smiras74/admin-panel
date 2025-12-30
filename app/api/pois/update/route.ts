@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
     const category = updates?.category ?? body.category;
     const subcategory = updates?.subcategory ?? body.subcategory;
     const photoUrls = updates?.photoUrls ?? body.photoUrls;
+    const newStatus = updates?.status ?? body.status;
     
     console.log('Update POI request:', { id, source, name, description: description?.substring(0, 50), photoUrls: photoUrls?.length });
     
@@ -23,36 +24,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Determine collection based on source
-    let collectionName: string = '';
-    switch (source) {
-      case 'verified':
-        collectionName = 'verified_pois';
-        break;
-      case 'osm':
-        collectionName = 'cached_pois';
-        break;
-      case 'ugc':
-        collectionName = 'custom_pois';
-        break;
-      default:
-        // Try to find the document in each collection
-        const collections = ['verified_pois', 'cached_pois', 'custom_pois'];
-        
-        for (const col of collections) {
-          const doc = await db.collection(col).doc(id).get();
-          if (doc.exists) {
-            collectionName = col;
-            break;
-          }
+    // First try the unified 'pois' collection
+    let docRef = db.collection('pois').doc(id);
+    let docSnap = await docRef.get();
+    let collectionName = 'pois';
+    
+    // Fallback to old collections if not found in 'pois'
+    if (!docSnap.exists) {
+      const oldCollections = ['verified_pois', 'cached_pois', 'custom_pois'];
+      
+      for (const col of oldCollections) {
+        const oldDoc = await db.collection(col).doc(id).get();
+        if (oldDoc.exists) {
+          collectionName = col;
+          docRef = db.collection(col).doc(id);
+          docSnap = oldDoc;
+          console.log(`Found POI in legacy collection: ${col}`);
+          break;
         }
-        
-        if (!collectionName) {
-          return NextResponse.json(
-            { error: 'POI not found in any collection' },
-            { status: 404 }
-          );
-        }
+      }
+      
+      if (!docSnap.exists) {
+        return NextResponse.json(
+          { error: 'POI not found in any collection' },
+          { status: 404 }
+        );
+      }
     }
 
     // Prepare update data
@@ -87,10 +84,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Allow status update (e.g., verify a cached POI)
+    if (newStatus !== undefined) {
+      updateData.status = newStatus;
+    }
+
     console.log('Updating document:', collectionName, id, 'with fields:', Object.keys(updateData));
 
     // Update the document
-    await db.collection(collectionName).doc(id).update(updateData);
+    await docRef.update(updateData);
 
     console.log(`POI updated: ${collectionName}/${id}`);
 
