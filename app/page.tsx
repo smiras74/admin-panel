@@ -10,7 +10,9 @@ import {
   MessageSquare,
   Clock,
   Navigation,
-  Mail
+  Mail,
+  FileText,
+  Image as ImageIcon
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { Navigation as Nav } from '@/components/Navigation';
@@ -23,9 +25,12 @@ interface Stats {
   pendingEdits: number;
   pendingReviews: number;
   totalKm: number;
-  totalPOIs: number | { verified: number; cached: number; custom: number };
-  verifiedPOIs: number;
-  cachedPOIs: number;
+  totalPOIs: number;
+  contentStats?: {
+    withPhoto: number;
+    withDescription: number;
+    toEnrich: number;
+  };
   waitlistCount: number;
 }
 
@@ -73,24 +78,6 @@ export default function DashboardPage() {
   }
 
   const pendingTotal = (stats?.pendingModeration || 0) + (stats?.pendingEdits || 0) + (stats?.pendingReviews || 0);
-  
-  const getTotalPOIs = () => {
-    if (!stats?.totalPOIs) return 0;
-    if (typeof stats.totalPOIs === 'number') return stats.totalPOIs;
-    return (stats.totalPOIs.verified || 0) + (stats.totalPOIs.cached || 0) + (stats.totalPOIs.custom || 0);
-  };
-  
-  const getVerifiedPOIs = () => {
-    if (stats?.verifiedPOIs) return stats.verifiedPOIs;
-    if (stats?.totalPOIs && typeof stats.totalPOIs === 'object') return stats.totalPOIs.verified || 0;
-    return 0;
-  };
-  
-  const getCachedPOIs = () => {
-    if (stats?.cachedPOIs) return stats.cachedPOIs;
-    if (stats?.totalPOIs && typeof stats.totalPOIs === 'object') return stats.totalPOIs.cached || 0;
-    return 0;
-  };
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -138,6 +125,29 @@ export default function DashboardPage() {
                 </div>
               )}
 
+              {/* POI Hero Card */}
+              <div 
+                className="mb-6 bg-gradient-to-br from-forest-900/50 to-forest-800/30 border border-forest-700/50 rounded-xl p-6 cursor-pointer hover:border-forest-600 transition-all"
+                onClick={() => router.push('/pois')}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-forest-400 text-sm font-medium mb-1">Points d'Intérêt</p>
+                    <p className="text-4xl font-bold text-gray-100">
+                      {(stats.totalPOIs || 0).toLocaleString()}
+                    </p>
+                    {stats.contentStats && (
+                      <p className="text-sm text-gray-400 mt-2">
+                        {stats.contentStats.withPhoto.toLocaleString()} avec photo • {stats.contentStats.withDescription.toLocaleString()} avec description • {stats.contentStats.toEnrich.toLocaleString()} à enrichir
+                      </p>
+                    )}
+                  </div>
+                  <div className="bg-forest-800/50 p-4 rounded-xl">
+                    <MapPin className="w-8 h-8 text-forest-400" />
+                  </div>
+                </div>
+              </div>
+
               {/* Stats Grid */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard
@@ -182,12 +192,11 @@ export default function DashboardPage() {
                   subtitle={`${(stats.totalKm || 0).toLocaleString()} km`}
                 />
                 <StatCard
-                  title="POI total"
-                  value={getTotalPOIs()}
-                  icon={MapPin}
-                  color="green"
-                  subtitle={`${getVerifiedPOIs()} vérifiés • ${getCachedPOIs()} OSM`}
-                  onClick={() => router.push('/pois')}
+                  title="Avec photo"
+                  value={stats.contentStats?.withPhoto || 0}
+                  icon={ImageIcon}
+                  color="purple"
+                  onClick={() => router.push('/pois?content=with-photo')}
                 />
                 <StatCard
                   title="Waitlist"
@@ -216,15 +225,15 @@ export default function DashboardPage() {
                   </button>
 
                   <button
-                    onClick={() => router.push('/moderation?tab=edits')}
-                    className="flex items-center gap-3 p-4 bg-gray-800 rounded-xl border border-gray-700 hover:border-purple-500 hover:bg-gray-750 transition-all text-left"
+                    onClick={() => router.push('/pois?content=empty')}
+                    className="flex items-center gap-3 p-4 bg-gray-800 rounded-xl border border-gray-700 hover:border-orange-500 hover:bg-gray-750 transition-all text-left"
                   >
-                    <div className="bg-purple-900 p-2 rounded-lg">
-                      <Edit3 className="w-5 h-5 text-purple-400" />
+                    <div className="bg-orange-900 p-2 rounded-lg">
+                      <FileText className="w-5 h-5 text-orange-400" />
                     </div>
                     <div>
-                      <p className="font-medium text-gray-100">Modifications</p>
-                      <p className="text-sm text-gray-400">{stats.pendingEdits || 0} en attente</p>
+                      <p className="font-medium text-gray-100">Enrichir POI</p>
+                      <p className="text-sm text-gray-400">{stats.contentStats?.toEnrich || 0} sans description</p>
                     </div>
                   </button>
 

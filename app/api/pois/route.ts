@@ -7,7 +7,6 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     
     const search = searchParams.get('search')?.toLowerCase() || '';
-    const status = searchParams.get('status') || 'all'; // 'all', 'verified', 'cached', 'pending'
     const category = searchParams.get('category') || 'all';
     const subcategory = searchParams.get('subcategory') || 'all';
     const contentFilter = searchParams.get('content') || 'all';
@@ -16,30 +15,15 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    // Get counts by status from unified collection
     const poisCollection = db.collection('pois');
     
-    const [totalCount, verifiedCount, cachedCount, pendingCount] = await Promise.all([
-      poisCollection.count().get(),
-      poisCollection.where('status', '==', 'verified').count().get(),
-      poisCollection.where('status', '==', 'cached').count().get(),
-      poisCollection.where('status', '==', 'pending').count().get(),
-    ]);
+    // Get total count
+    const totalCount = await poisCollection.count().get();
 
-    const counts = {
-      total: totalCount.data().count,
-      verified: verifiedCount.data().count,
-      cached: cachedCount.data().count,
-      pending: pendingCount.data().count,
-    };
-
-    // Build query
-    let query = poisCollection.limit(500);
-    
-    // Apply status filter
-    if (status !== 'all') {
-      query = query.where('status', '==', status);
-    }
+    // Build query - увеличиваем лимит для поиска
+    // Если есть поиск - загружаем больше для фильтрации
+    const queryLimit = search ? 5000 : 1000;
+    let query = poisCollection.limit(queryLimit);
     
     // Apply category filter
     if (category !== 'all') {
@@ -60,7 +44,12 @@ export async function GET(request: NextRequest) {
       if (seenIds.has(doc.id)) return;
       
       // Apply search filter
-      if (search && !data.name?.toLowerCase().includes(search)) return;
+      if (search) {
+        const nameMatch = data.name?.toLowerCase().includes(search);
+        const descMatch = data.description?.toLowerCase().includes(search);
+        const idMatch = doc.id.toLowerCase().includes(search);
+        if (!nameMatch && !descMatch && !idMatch) return;
+      }
 
       // Apply subcategory filter
       if (subcategory !== 'all' && data.subcategory !== subcategory) return;
@@ -88,10 +77,12 @@ export async function GET(request: NextRequest) {
       const photoUrls = data.photoUrls || (data.photoUrl ? [data.photoUrl] : []);
       const hasPhoto = photoUrls.length > 0;
       const hasDescription = !!data.description && data.description.trim().length > 0;
+      const hasOpeningHours = !!data.openingHours;
 
       // Apply content filter
       if (contentFilter === 'with-photo' && !hasPhoto) return;
       if (contentFilter === 'with-description' && !hasDescription) return;
+      if (contentFilter === 'with-hours' && !hasOpeningHours) return;
       if (contentFilter === 'complete' && (!hasPhoto || !hasDescription)) return;
       if (contentFilter === 'empty' && (hasPhoto || hasDescription)) return;
       
@@ -100,13 +91,6 @@ export async function GET(request: NextRequest) {
       if (data.subcategory) {
         allSubcategories.add(data.subcategory);
       }
-      
-      // Map status to source for backward compatibility with UI
-      const sourceFromStatus = {
-        'verified': 'verified',
-        'cached': 'osm',
-        'pending': 'ugc',
-      }[data.status] || 'osm';
       
       allPois.push({
         id: doc.id,
@@ -119,10 +103,12 @@ export async function GET(request: NextRequest) {
         photoUrls: photoUrls,
         hasPhoto,
         hasDescription,
+        hasOpeningHours,
+        openingHours: data.openingHours,
         averageRating: data.averageRating,
         ratingCount: data.ratingCount || 0,
         checkInCount: data.checkInCount || 0,
-        source: sourceFromStatus,
+        source: data.source || 'osm',
         status: data.status,
         createdAt: data.createdAt?.toDate?.() || null,
         cachedAt: data.cachedAt?.toDate?.() || null,
@@ -161,17 +147,18 @@ export async function GET(request: NextRequest) {
     const startIndex = (page - 1) * limit;
     const pois = allPois.slice(startIndex, startIndex + limit);
 
-    // Content stats
+    // Content stats (from filtered results)
     const contentStats = {
       withPhoto: allPois.filter(p => p.hasPhoto).length,
       withDescription: allPois.filter(p => p.hasDescription).length,
+      withOpeningHours: allPois.filter(p => p.hasOpeningHours).length,
       complete: allPois.filter(p => p.hasPhoto && p.hasDescription).length,
       empty: allPois.filter(p => !p.hasPhoto && !p.hasDescription).length,
     };
 
     return NextResponse.json({ 
       pois, 
-      counts,
+      totalInDatabase: totalCount.data().count,
       contentStats,
       subcategories: Array.from(allSubcategories).sort(),
       pagination: {

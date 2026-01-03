@@ -1,27 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const { db } = getFirebaseAdmin();
-
+    
+    const poisCollection = db.collection('pois');
+    
     // Get counts in parallel
     const [
       usersCount,
-      verifiedPoisCount,
-      cachedPoisCount,
-      customPoisCount,
+      totalPoisCount,
       pendingModerationCount,
       waitlistCount,
+      // Content stats - POI с фото
+      withPhotoCount,
+      // Content stats - POI с описанием
+      withDescriptionCount,
     ] = await Promise.all([
       db.collection('users').count().get(),
-      db.collection('verified_pois').count().get(),
-      db.collection('cached_pois').count().get(),
-      db.collection('custom_pois').count().get(),
-      db.collection('custom_pois').where('status', '==', 'pending').count().get().catch(() => ({ data: () => ({ count: 0 }) })),
+      poisCollection.count().get(),
+      poisCollection.where('status', '==', 'pending').count().get().catch(() => ({ data: () => ({ count: 0 }) })),
       db.collection('waitlist').count().get().catch(() => ({ data: () => ({ count: 0 }) })),
+      // POI с фото (photoUrls существует и не пустой)
+      poisCollection.where('photoUrls', '!=', []).count().get().catch(() => ({ data: () => ({ count: 0 }) })),
+      // POI с описанием
+      poisCollection.where('description', '!=', '').count().get().catch(() => ({ data: () => ({ count: 0 }) })),
     ]);
-
+    
     // Get aggregated stats from users
     const usersSnapshot = await db.collection('users').select('totalCheckIns', 'totalKm', 'totalKmTraveled').get();
     
@@ -33,7 +41,7 @@ export async function GET(request: NextRequest) {
       totalCheckIns += data.totalCheckIns || 0;
       totalKm += data.totalKm || data.totalKmTraveled || 0;
     });
-
+    
     // Count pending edits and reviews (if collections exist)
     let pendingEdits = 0;
     let pendingReviews = 0;
@@ -51,16 +59,20 @@ export async function GET(request: NextRequest) {
     } catch (e) {
       // Collection might not exist
     }
-
+    
+    const total = totalPoisCount.data().count;
+    const withPhoto = withPhotoCount.data().count;
+    const withDescription = withDescriptionCount.data().count;
+    
     const stats = {
       totalUsers: usersCount.data().count,
-      totalPOIs: {
-        verified: verifiedPoisCount.data().count,
-        cached: cachedPoisCount.data().count,
-        custom: customPoisCount.data().count,
+      totalPOIs: total,
+      // Content stats
+      contentStats: {
+        withPhoto,
+        withDescription,
+        toEnrich: total - withDescription, // POI без описания
       },
-      verifiedPOIs: verifiedPoisCount.data().count,
-      cachedPOIs: cachedPoisCount.data().count,
       pendingModeration: pendingModerationCount.data().count,
       pendingEdits,
       pendingReviews,
@@ -68,9 +80,14 @@ export async function GET(request: NextRequest) {
       totalKm,
       waitlistCount: waitlistCount.data().count,
     };
-
-    return NextResponse.json(stats);
-
+    
+    return NextResponse.json(stats, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
   } catch (error) {
     console.error('Error fetching stats:', error);
     return NextResponse.json(

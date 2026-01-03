@@ -46,16 +46,14 @@ interface POI {
   averageRating?: number;
   ratingCount?: number;
   checkInCount?: number;
-  source: 'verified' | 'osm' | 'ugc';
+  source: 'verified' | 'osm' | 'user';
   status?: string;
   createdAt?: string;
   cachedAt?: string;
 }
 
 interface Counts {
-  verified: number;
-  cached: number;
-  custom: number;
+  total: number;
 }
 
 interface ContentStats {
@@ -77,7 +75,7 @@ interface Pagination {
 const SOURCE_LABELS: Record<string, { label: string; color: string; icon: any }> = {
   verified: { label: 'Vérifié', color: 'bg-green-900 text-green-300', icon: Verified },
   osm: { label: 'OSM', color: 'bg-blue-900 text-blue-300', icon: Database },
-  ugc: { label: 'Utilisateur', color: 'bg-purple-900 text-purple-300', icon: Users },
+  user: { label: 'Utilisateur', color: 'bg-purple-900 text-purple-300', icon: Users },
 };
 
 const CATEGORIES = [
@@ -123,7 +121,7 @@ export default function POIsPage() {
   const router = useRouter();
   
   const [pois, setPois] = useState<POI[]>([]);
-  const [counts, setCounts] = useState<Counts>({ verified: 0, cached: 0, custom: 0 });
+  const [counts, setCounts] = useState<Counts>({ total: 0 });
   const [contentStats, setContentStats] = useState<ContentStats>({ withPhoto: 0, withDescription: 0, complete: 0, empty: 0 });
   const [subcategories, setSubcategories] = useState<string[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
@@ -199,7 +197,6 @@ export default function POIsPage() {
     try {
       const params = new URLSearchParams();
       if (searchQuery) params.set('search', searchQuery);
-      if (sourceFilter !== 'all') params.set('source', sourceFilter);
       if (categoryFilter !== 'all') params.set('category', categoryFilter);
       if (subcategoryFilter !== 'all') params.set('subcategory', subcategoryFilter);
       if (contentFilter !== 'all') params.set('content', contentFilter);
@@ -217,7 +214,7 @@ export default function POIsPage() {
       if (response.ok) {
         const data = await response.json();
         setPois(data.pois || []);
-        setCounts(data.counts || { verified: 0, cached: 0, custom: 0 });
+        setCounts({ total: data.totalInDatabase || data.pagination?.totalCount || 0 });
         setContentStats(data.contentStats || { withPhoto: 0, withDescription: 0, complete: 0, empty: 0 });
         setSubcategories(data.subcategories || []);
         setPagination(data.pagination || null);
@@ -227,7 +224,7 @@ export default function POIsPage() {
     } finally {
       setLoading(false);
     }
-  }, [user, searchQuery, sourceFilter, categoryFilter, subcategoryFilter, contentFilter, sortOption, page]);
+  }, [user, searchQuery, categoryFilter, subcategoryFilter, contentFilter, sortOption, page]);
 
   useEffect(() => {
     const debounce = setTimeout(() => {
@@ -523,7 +520,7 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
     );
   }
 
-  const totalPOIs = counts.verified + counts.cached + counts.custom;
+  const totalPOIs = counts.total;
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -535,7 +532,7 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
           <div className="mb-6">
             <h1 className="text-2xl font-semibold text-gray-100">Points d'Intérêt</h1>
             <p className="text-gray-400 mt-1">
-              {totalPOIs.toLocaleString()} POI au total • {counts.verified} vérifiés • {counts.cached} OSM • {counts.custom} utilisateurs
+              {totalPOIs.toLocaleString()} POI au total
             </p>
           </div>
 
@@ -631,21 +628,7 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
           {/* Filters Panel */}
           {showFilters && (
             <div className="bg-gray-800 rounded-xl border border-gray-700 p-4 mb-4 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1.5">Source</label>
-                  <select
-                    value={sourceFilter}
-                    onChange={(e) => setSourceFilter(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-forest-500"
-                  >
-                    <option value="all">Toutes sources</option>
-                    <option value="verified">Vérifiés</option>
-                    <option value="cached">OSM (cached)</option>
-                    <option value="custom">Utilisateurs</option>
-                  </select>
-                </div>
-
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-400 mb-1.5">Catégorie</label>
                   <select
@@ -690,15 +673,9 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
           )}
 
           {/* Active Filters */}
-          {(sourceFilter !== 'all' || categoryFilter !== 'all' || subcategoryFilter !== 'all' || contentFilter !== 'all') && (
+          {(categoryFilter !== 'all' || subcategoryFilter !== 'all' || contentFilter !== 'all') && (
             <div className="flex flex-wrap items-center gap-2 mb-4">
               <span className="text-xs text-gray-500">Filtres actifs:</span>
-              {sourceFilter !== 'all' && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded-lg text-xs text-gray-300">
-                  Source: {sourceFilter}
-                  <button onClick={() => setSourceFilter('all')} className="text-gray-500 hover:text-gray-300">×</button>
-                </span>
-              )}
               {categoryFilter !== 'all' && (
                 <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded-lg text-xs text-gray-300">
                   Catégorie: {categoryFilter}
@@ -719,7 +696,6 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
               )}
               <button 
                 onClick={() => {
-                  setSourceFilter('all');
                   setCategoryFilter('all');
                   setSubcategoryFilter('all');
                   setContentFilter('all');
