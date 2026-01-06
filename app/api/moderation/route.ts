@@ -176,12 +176,40 @@ export async function POST(request: NextRequest) {
 
     if (action === 'approve') {
       if (type === 'new_poi') {
-        // Approve new POI - change status to approved
-        await db.collection('custom_pois').doc(id).update({
-          status: 'approved',
-          approvedAt: new Date(),
-          approvedByAdmin: true,
-        });
+        // Approve new POI - copy to main 'pois' collection with status 'published'
+        const pendingDoc = await db.collection('custom_pois').doc(id).get();
+        
+        if (pendingDoc.exists) {
+          const poiData = pendingDoc.data();
+          
+          // Prepare data for main collection
+          const publishedData = {
+            ...poiData,
+            status: 'published',
+            approvedAt: new Date(),
+            approvedByAdmin: true,
+            publishedAt: new Date(),
+            // Ensure coordinate format for geoqueries
+            coordinate: poiData?.latitude && poiData?.longitude 
+              ? new (require('firebase-admin').firestore.GeoPoint)(poiData.latitude, poiData.longitude)
+              : null,
+          };
+          
+          // Copy to main pois collection
+          await db.collection('pois').doc(id).set(publishedData);
+          
+          // Update status in custom_pois
+          await db.collection('custom_pois').doc(id).update({
+            status: 'approved',
+            approvedAt: new Date(),
+            approvedByAdmin: true,
+          });
+          
+          // TODO: Award XP to user (+30 or +50 if has photo)
+          // const userId = poiData?.createdBy;
+          // const hasPhoto = poiData?.photoUrls?.length > 0;
+          // const xpReward = hasPhoto ? 50 : 30;
+        }
       } else if (type === 'edit') {
         // Approve edit - apply changes to original POI
         if (poiId && poiCollection && changes) {
