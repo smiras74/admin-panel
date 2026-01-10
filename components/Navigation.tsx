@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
@@ -12,7 +12,10 @@ import {
   X,
   LogOut,
   Bell,
-  AlertTriangle
+  AlertTriangle,
+  MessageSquare,
+  Edit3,
+  PlusCircle
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 
@@ -35,7 +38,20 @@ export function Navigation() {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [counts, setCounts] = useState<PendingCounts>({ pois: 0, edits: 0, reviews: 0, reports: 0, total: 0 });
+  const notificationRef = useRef<HTMLDivElement>(null);
+
+  // Close notifications when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setNotificationsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Fetch pending counts
   useEffect(() => {
@@ -53,13 +69,11 @@ export function Navigation() {
 
     if (user) {
       fetchCounts();
-      // Refresh every 30 seconds
       const interval = setInterval(fetchCounts, 30000);
       return () => clearInterval(interval);
     }
   }, [user]);
 
-  // Calculate moderation count (pois + edits + reviews)
   const moderationCount = counts.pois + counts.edits + counts.reviews;
 
   const navItems: NavItem[] = [
@@ -81,6 +95,42 @@ export function Navigation() {
     if (href === '/') return pathname === '/';
     return pathname.startsWith(href);
   };
+
+  // Notification items for dropdown
+  const notificationItems = [
+    { 
+      href: '/moderation?tab=pois', 
+      label: 'Nouveaux POI', 
+      count: counts.pois, 
+      icon: PlusCircle,
+      color: 'text-green-400',
+      bgColor: 'bg-green-900/50'
+    },
+    { 
+      href: '/moderation?tab=edits', 
+      label: 'Modifications', 
+      count: counts.edits, 
+      icon: Edit3,
+      color: 'text-amber-400',
+      bgColor: 'bg-amber-900/50'
+    },
+    { 
+      href: '/moderation?tab=reviews', 
+      label: 'Commentaires', 
+      count: counts.reviews, 
+      icon: MessageSquare,
+      color: 'text-blue-400',
+      bgColor: 'bg-blue-900/50'
+    },
+    { 
+      href: '/reports', 
+      label: 'Signalements', 
+      count: counts.reports, 
+      icon: AlertTriangle,
+      color: 'text-orange-400',
+      bgColor: 'bg-orange-900/50'
+    },
+  ];
 
   return (
     <>
@@ -172,15 +222,65 @@ export function Navigation() {
             <span className="font-semibold text-gray-100">Admin</span>
           </div>
 
-          <div className="relative">
-            {counts.total > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                {counts.total > 9 ? '9+' : counts.total}
-              </span>
-            )}
-            <Link href="/moderation" className="p-2 -mr-2 text-gray-300">
+          {/* Notification Bell with Dropdown */}
+          <div className="relative" ref={notificationRef}>
+            <button 
+              onClick={() => setNotificationsOpen(!notificationsOpen)}
+              className="p-2 -mr-2 text-gray-300 relative"
+            >
               <Bell className="w-6 h-6" />
-            </Link>
+              {counts.total > 0 && (
+                <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center font-bold">
+                  {counts.total > 99 ? '99+' : counts.total}
+                </span>
+              )}
+            </button>
+
+            {/* Dropdown Menu */}
+            {notificationsOpen && (
+              <div className="absolute right-0 top-12 w-72 bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden z-50">
+                <div className="px-4 py-3 border-b border-gray-700">
+                  <h3 className="font-semibold text-gray-100">Notifications</h3>
+                  <p className="text-xs text-gray-500">{counts.total} en attente</p>
+                </div>
+                
+                <div className="max-h-80 overflow-y-auto">
+                  {notificationItems.map((item) => {
+                    const Icon = item.icon;
+                    if (item.count === 0) return null;
+                    
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setNotificationsOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-gray-700/50 transition-colors"
+                      >
+                        <div className={`w-10 h-10 rounded-lg ${item.bgColor} flex items-center justify-center`}>
+                          <Icon className={`w-5 h-5 ${item.color}`} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-200">{item.label}</p>
+                          <p className="text-xs text-gray-500">{item.count} en attente</p>
+                        </div>
+                        <span className={`text-white text-xs px-2 py-1 rounded-full ${
+                          item.href.includes('reports') ? 'bg-orange-500' : 'bg-red-500'
+                        }`}>
+                          {item.count}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                  
+                  {counts.total === 0 && (
+                    <div className="px-4 py-8 text-center">
+                      <Bell className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+                      <p className="text-gray-500 text-sm">Aucune notification</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -278,7 +378,7 @@ export function Navigation() {
                 <div className="relative">
                   <Icon className="w-5 h-5" />
                   {badgeCount > 0 && (
-                    <span className={`absolute -top-1.5 -right-1.5 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center ${
+                    <span className={`absolute -top-1.5 -right-2.5 text-white text-[10px] min-w-[16px] h-[16px] px-1 rounded-full flex items-center justify-center font-bold ${
                       item.badgeKey === 'reports' ? 'bg-orange-500' : 'bg-red-500'
                     }`}>
                       {badgeCount > 9 ? '9+' : badgeCount}
