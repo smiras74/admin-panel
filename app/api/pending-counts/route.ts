@@ -44,12 +44,14 @@ export async function GET(request: NextRequest) {
       console.log('Error counting pending reviews:', e.message);
     }
 
-    // Pending reports
+    // Pending reports - need to count both status=pending AND missing status
     try {
-      const reportsSnapshot = await db.collection('reports')
-        .where('status', '==', 'pending')
-        .get();
-      counts.reports = reportsSnapshot.size;
+      // Get all reports and filter (because old reports might not have status field)
+      const reportsSnapshot = await db.collection('reports').limit(200).get();
+      counts.reports = reportsSnapshot.docs.filter((doc: any) => {
+        const status = doc.data().status;
+        return !status || status === 'pending';
+      }).length;
     } catch (e: any) {
       console.log('Error counting pending reports:', e.message);
     }

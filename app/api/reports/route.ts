@@ -8,18 +8,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'pending';
 
-    let query = db.collection('reports').orderBy('createdAt', 'desc').limit(100);
+    // Always fetch all reports then filter (because old reports might not have status field)
+    const snapshot = await db.collection('reports')
+      .orderBy('createdAt', 'desc')
+      .limit(200)
+      .get();
     
-    if (status !== 'all') {
-      query = db.collection('reports')
-        .where('status', '==', status)
-        .orderBy('createdAt', 'desc')
-        .limit(100);
-    }
-
-    const snapshot = await query.get();
-    
-    const reports = snapshot.docs.map((doc: any) => {
+    let reports = snapshot.docs.map((doc: any) => {
       const data = doc.data();
       return {
         id: doc.id,
@@ -29,6 +24,7 @@ export async function GET(request: NextRequest) {
         comment: data.comment || null,
         photoUrl: data.photoUrl || null,
         userId: data.userId,
+        // Treat missing status as 'pending'
         status: data.status || 'pending',
         createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
         poiLocation: data.poiLocation ? {
@@ -37,6 +33,11 @@ export async function GET(request: NextRequest) {
         } : null,
       };
     });
+
+    // Filter by status (on server side)
+    if (status !== 'all') {
+      reports = reports.filter(r => r.status === status);
+    }
 
     return NextResponse.json({ reports });
 
