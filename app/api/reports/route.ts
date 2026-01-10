@@ -98,19 +98,29 @@ export async function POST(request: NextRequest) {
       case 'delete_poi':
         // Delete the POI and mark report as resolved
         const targetPoiId = poiId || reportData?.poiId;
+        const poiName = reportData?.poiName || 'Unknown';
+        const poiLocation = reportData?.poiLocation;
         
         if (targetPoiId) {
-          // Try to delete from multiple collections
+          // Try to delete from multiple collections and get OSM ID
           const collections = ['pois', 'cached_pois', 'custom_pois', 'verified_pois'];
+          let osmId: string | null = null;
+          let foundPoiData: any = null;
           
           for (const collection of collections) {
             try {
               const poiDoc = await db.collection(collection).doc(targetPoiId).get();
               if (poiDoc.exists) {
-                // Option 1: Hard delete
-                // await db.collection(collection).doc(targetPoiId).delete();
+                foundPoiData = poiDoc.data();
                 
-                // Option 2: Soft delete (mark as deleted)
+                // Extract OSM ID if exists
+                if (foundPoiData?.osmId) {
+                  osmId = foundPoiData.osmId;
+                } else if (targetPoiId.startsWith('node/') || targetPoiId.startsWith('way/') || targetPoiId.startsWith('relation/')) {
+                  osmId = targetPoiId;
+                }
+                
+                // Soft delete
                 await db.collection(collection).doc(targetPoiId).update({
                   status: 'deleted',
                   deletedAt: new Date(),
@@ -124,6 +134,34 @@ export async function POST(request: NextRequest) {
               // Collection might not have this POI, continue
             }
           }
+          
+          // Add to blocked_pois to prevent OSM re-import
+          const blockData: any = {
+            poiId: targetPoiId,
+            poiName: foundPoiData?.name || poiName,
+            reason: reportData?.type || 'closed',
+            reportId: reportId,
+            blockedAt: new Date(),
+            blockedByAdmin: true,
+          };
+          
+          if (osmId) {
+            blockData.osmId = osmId;
+          }
+          
+          if (poiLocation) {
+            blockData.location = poiLocation;
+          } else if (foundPoiData?.coordinate) {
+            blockData.location = foundPoiData.coordinate;
+          } else if (foundPoiData?.latitude && foundPoiData?.longitude) {
+            blockData.location = {
+              latitude: foundPoiData.latitude,
+              longitude: foundPoiData.longitude,
+            };
+          }
+          
+          await db.collection('blocked_pois').doc(targetPoiId).set(blockData);
+          console.log(`POI ${targetPoiId} added to blocked_pois`);
         }
         
         // Mark report as resolved

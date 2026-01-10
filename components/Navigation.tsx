@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
@@ -20,25 +20,62 @@ interface NavItem {
   href: string;
   label: string;
   icon: React.ElementType;
-  badge?: number;
+  badgeKey?: 'moderation' | 'reports';
 }
 
-interface NavigationProps {
-  pendingCount?: number;
+interface PendingCounts {
+  pois: number;
+  edits: number;
+  reviews: number;
+  reports: number;
+  total: number;
 }
 
-export function Navigation({ pendingCount = 0 }: NavigationProps) {
+export function Navigation() {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [counts, setCounts] = useState<PendingCounts>({ pois: 0, edits: 0, reviews: 0, reports: 0, total: 0 });
+
+  // Fetch pending counts
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const response = await fetch('/api/pending-counts');
+        if (response.ok) {
+          const data = await response.json();
+          setCounts(data);
+        }
+      } catch (error) {
+        console.error('Error fetching pending counts:', error);
+      }
+    };
+
+    if (user) {
+      fetchCounts();
+      // Refresh every 30 seconds
+      const interval = setInterval(fetchCounts, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  // Calculate moderation count (pois + edits + reviews)
+  const moderationCount = counts.pois + counts.edits + counts.reviews;
 
   const navItems: NavItem[] = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/moderation', label: 'Modération', icon: Shield, badge: pendingCount },
-    { href: '/reports', label: 'Signalements', icon: AlertTriangle },
+    { href: '/moderation', label: 'Modération', icon: Shield, badgeKey: 'moderation' },
+    { href: '/reports', label: 'Signalements', icon: AlertTriangle, badgeKey: 'reports' },
     { href: '/pois', label: 'POIs', icon: MapPin },
     { href: '/users', label: 'Utilisateurs', icon: Users },
   ];
+
+  const getBadgeCount = (badgeKey?: 'moderation' | 'reports'): number => {
+    if (!badgeKey) return 0;
+    if (badgeKey === 'moderation') return moderationCount;
+    if (badgeKey === 'reports') return counts.reports;
+    return 0;
+  };
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
@@ -64,6 +101,7 @@ export function Navigation({ pendingCount = 0 }: NavigationProps) {
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
+            const badgeCount = getBadgeCount(item.badgeKey);
             
             return (
               <Link
@@ -80,9 +118,11 @@ export function Navigation({ pendingCount = 0 }: NavigationProps) {
               >
                 <Icon className="w-5 h-5" />
                 <span className="flex-1">{item.label}</span>
-                {item.badge !== undefined && item.badge > 0 && (
-                  <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
-                    {item.badge > 99 ? '99+' : item.badge}
+                {badgeCount > 0 && (
+                  <span className={`text-white text-xs px-2 py-0.5 rounded-full ${
+                    item.badgeKey === 'reports' ? 'bg-orange-500' : 'bg-red-500'
+                  }`}>
+                    {badgeCount > 99 ? '99+' : badgeCount}
                   </span>
                 )}
               </Link>
@@ -133,9 +173,9 @@ export function Navigation({ pendingCount = 0 }: NavigationProps) {
           </div>
 
           <div className="relative">
-            {pendingCount > 0 && (
+            {counts.total > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                {pendingCount > 9 ? '9+' : pendingCount}
+                {counts.total > 9 ? '9+' : counts.total}
               </span>
             )}
             <Link href="/moderation" className="p-2 -mr-2 text-gray-300">
@@ -178,6 +218,7 @@ export function Navigation({ pendingCount = 0 }: NavigationProps) {
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
+            const badgeCount = getBadgeCount(item.badgeKey);
             
             return (
               <Link
@@ -194,9 +235,11 @@ export function Navigation({ pendingCount = 0 }: NavigationProps) {
               >
                 <Icon className="w-5 h-5" />
                 <span className="flex-1">{item.label}</span>
-                {item.badge !== undefined && item.badge > 0 && (
-                  <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
-                    {item.badge}
+                {badgeCount > 0 && (
+                  <span className={`text-white text-xs px-2 py-0.5 rounded-full ${
+                    item.badgeKey === 'reports' ? 'bg-orange-500' : 'bg-red-500'
+                  }`}>
+                    {badgeCount}
                   </span>
                 )}
               </Link>
@@ -221,6 +264,7 @@ export function Navigation({ pendingCount = 0 }: NavigationProps) {
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
+            const badgeCount = getBadgeCount(item.badgeKey);
             
             return (
               <Link
@@ -233,9 +277,11 @@ export function Navigation({ pendingCount = 0 }: NavigationProps) {
               >
                 <div className="relative">
                   <Icon className="w-5 h-5" />
-                  {item.badge !== undefined && item.badge > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
-                      {item.badge > 9 ? '9+' : item.badge}
+                  {badgeCount > 0 && (
+                    <span className={`absolute -top-1.5 -right-1.5 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center ${
+                      item.badgeKey === 'reports' ? 'bg-orange-500' : 'bg-red-500'
+                    }`}>
+                      {badgeCount > 9 ? '9+' : badgeCount}
                     </span>
                   )}
                 </div>
