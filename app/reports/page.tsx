@@ -116,6 +116,8 @@ export default function ReportsPage() {
 
       if (response.ok) {
         setReports(prev => prev.filter(r => r.id !== reportId));
+        // Refresh notification counts
+        window.dispatchEvent(new Event('refresh-pending-counts'));
       }
     } catch (error) {
       console.error('Error processing action:', error);

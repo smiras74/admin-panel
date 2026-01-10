@@ -139,6 +139,8 @@ function ModerationContent() {
         } else {
           setReviews(prev => prev.filter(r => r.id !== id));
         }
+        // Refresh notification counts
+        window.dispatchEvent(new Event('refresh-pending-counts'));
       }
     } catch (error) {
       console.error('Error processing action:', error);

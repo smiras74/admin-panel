@@ -69,8 +69,17 @@ export function Navigation() {
 
     if (user) {
       fetchCounts();
+      // Refresh every 30 seconds
       const interval = setInterval(fetchCounts, 30000);
-      return () => clearInterval(interval);
+      
+      // Listen for manual refresh event
+      const handleRefresh = () => fetchCounts();
+      window.addEventListener('refresh-pending-counts', handleRefresh);
+      
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('refresh-pending-counts', handleRefresh);
+      };
     }
   }, [user]);
 
