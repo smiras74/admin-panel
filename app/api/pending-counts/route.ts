@@ -18,44 +18,40 @@ export async function GET(request: NextRequest) {
     try {
       const poisSnapshot = await db.collection('custom_pois')
         .where('status', '==', 'pending')
-        .count()
         .get();
-      counts.pois = poisSnapshot.data().count;
-    } catch (e) {
-      // Index might not exist
+      counts.pois = poisSnapshot.size;
+    } catch (e: any) {
+      console.log('Error counting pending POIs:', e.message);
     }
 
     // Pending edits (poi_edits with status=pending)
     try {
       const editsSnapshot = await db.collection('poi_edits')
         .where('status', '==', 'pending')
-        .count()
         .get();
-      counts.edits = editsSnapshot.data().count;
-    } catch (e) {
-      // Index might not exist
+      counts.edits = editsSnapshot.size;
+    } catch (e: any) {
+      console.log('Error counting pending edits:', e.message);
     }
 
     // Pending reviews
     try {
       const reviewsSnapshot = await db.collection('reviews')
         .where('status', '==', 'pending')
-        .count()
         .get();
-      counts.reviews = reviewsSnapshot.data().count;
-    } catch (e) {
-      // Index might not exist
+      counts.reviews = reviewsSnapshot.size;
+    } catch (e: any) {
+      console.log('Error counting pending reviews:', e.message);
     }
 
     // Pending reports
     try {
       const reportsSnapshot = await db.collection('reports')
         .where('status', '==', 'pending')
-        .count()
         .get();
-      counts.reports = reportsSnapshot.data().count;
-    } catch (e) {
-      // Index might not exist
+      counts.reports = reportsSnapshot.size;
+    } catch (e: any) {
+      console.log('Error counting pending reports:', e.message);
     }
 
     counts.total = counts.pois + counts.edits + counts.reviews + counts.reports;
