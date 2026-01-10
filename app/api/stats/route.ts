@@ -42,9 +42,10 @@ export async function GET(request: NextRequest) {
       totalKm += data.totalKm || data.totalKmTraveled || 0;
     });
     
-    // Count pending edits and reviews (if collections exist)
+    // Count pending edits and reviews
     let pendingEdits = 0;
     let pendingReviews = 0;
+    let totalReviews = 0;
     
     try {
       const editsCount = await db.collection('poi_edits').where('status', '==', 'pending').count().get();
@@ -54,11 +55,12 @@ export async function GET(request: NextRequest) {
     }
     
     try {
-      // Fetch all and filter locally (avoid index issues)
-      const reviewsSnapshot = await db.collection('reviews').limit(200).get();
+      // Total reviews (all comments for statistics)
+      const reviewsSnapshot = await db.collection('reviews').limit(500).get();
+      totalReviews = reviewsSnapshot.size;
+      // Pending reviews (for moderation alert)
       pendingReviews = reviewsSnapshot.docs.filter((doc: any) => {
-        const status = doc.data().status;
-        return status === 'pending';
+        return doc.data().status === 'pending';
       }).length;
     } catch (e) {
       // Collection might not exist
@@ -80,6 +82,7 @@ export async function GET(request: NextRequest) {
       pendingModeration: pendingModerationCount.data().count,
       pendingEdits,
       pendingReviews,
+      totalReviews,
       totalCheckIns,
       totalKm,
       waitlistCount: waitlistCount.data().count,

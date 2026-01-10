@@ -24,6 +24,7 @@ interface Stats {
   totalCheckIns: number;
   pendingEdits: number;
   pendingReviews: number;
+  totalReviews: number;
   totalKm: number;
   totalPOIs: number;
   contentStats?: {
@@ -179,10 +180,9 @@ export default function DashboardPage() {
                 />
                 <StatCard
                   title="Commentaires"
-                  value={stats.pendingReviews || 0}
+                  value={stats.totalReviews || 0}
                   icon={MessageSquare}
                   color="blue"
-                  subtitle="en attente"
                 />
                 <StatCard
                   title="Distance totale"
