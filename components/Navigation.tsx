@@ -11,7 +11,8 @@ import {
   Menu,
   X,
   LogOut,
-  Bell
+  Bell,
+  AlertTriangle
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 
@@ -34,6 +35,7 @@ export function Navigation({ pendingCount = 0 }: NavigationProps) {
   const navItems: NavItem[] = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/moderation', label: 'Modération', icon: Shield, badge: pendingCount },
+    { href: '/reports', label: 'Signalements', icon: AlertTriangle },
     { href: '/pois', label: 'POIs', icon: MapPin },
     { href: '/users', label: 'Utilisateurs', icon: Users },
   ];
