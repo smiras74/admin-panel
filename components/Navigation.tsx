@@ -57,7 +57,7 @@ export function Navigation() {
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        const response = await fetch('/api/pending-counts');
+        const response = await fetch('/api/pending-counts', { cache: 'no-store' });
         if (response.ok) {
           const data = await response.json();
           setCounts(data);
