@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 
+// Force dynamic rendering to prevent caching
+export const dynamic = 'force-dynamic';
+
 // GET - Fetch all pending counts for notifications
 export async function GET(request: NextRequest) {
   try {
@@ -14,9 +17,9 @@ export async function GET(request: NextRequest) {
       total: 0,
     };
 
-    // Pending POIs (custom_pois with status=pending)
+    // Pending POIs (pois with status=pending)
     try {
-      const poisSnapshot = await db.collection('custom_pois')
+      const poisSnapshot = await db.collection('pois')
         .where('status', '==', 'pending')
         .get();
       counts.pois = poisSnapshot.size;
@@ -59,13 +62,21 @@ export async function GET(request: NextRequest) {
 
     counts.total = counts.pois + counts.edits + counts.reviews + counts.reports;
 
-    return NextResponse.json(counts);
+    return NextResponse.json(counts, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
 
   } catch (error) {
     console.error('Error fetching pending counts:', error);
     return NextResponse.json(
       { error: 'Failed to fetch counts', pois: 0, edits: 0, reviews: 0, reports: 0, total: 0 },
-      { status: 500 }
+      { status: 500, headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+      }}
     );
   }
 }
