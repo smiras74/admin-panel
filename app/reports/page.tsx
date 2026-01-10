@@ -15,7 +15,8 @@ import {
   ExternalLink,
   XCircle,
   AlertCircle,
-  Lock
+  Lock,
+  Eye
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { Navigation } from '@/components/Navigation';
@@ -230,13 +231,20 @@ export default function ReportsPage() {
                           </div>
                           
                           {/* POI Name */}
-                          <h3 className="font-medium text-gray-100 mb-2 flex items-center gap-2">
+                          <h3 className="font-medium text-gray-100 mb-2 flex items-center gap-2 flex-wrap">
                             <MapPin className="w-4 h-4 text-gray-500" />
                             {report.poiName}
+                            <button
+                              onClick={() => router.push(`/pois?search=${encodeURIComponent(report.poiName)}`)}
+                              className="text-forest-400 hover:text-forest-300 flex items-center gap-1"
+                              title="Voir / Modifier ce POI"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
                             {report.poiLocation && (
                               <button
                                 onClick={() => openInMaps(report.poiLocation?.latitude, report.poiLocation?.longitude)}
-                                className="text-forest-400 hover:text-forest-300"
+                                className="text-blue-400 hover:text-blue-300"
                                 title="Voir sur Google Maps"
                               >
                                 <ExternalLink className="w-4 h-4" />
