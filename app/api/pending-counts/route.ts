@@ -34,12 +34,13 @@ export async function GET(request: NextRequest) {
       console.log('Error counting pending edits:', e.message);
     }
 
-    // Pending reviews
+    // Pending reviews - fetch all and filter locally
     try {
-      const reviewsSnapshot = await db.collection('reviews')
-        .where('status', '==', 'pending')
-        .get();
-      counts.reviews = reviewsSnapshot.size;
+      const reviewsSnapshot = await db.collection('reviews').limit(200).get();
+      counts.reviews = reviewsSnapshot.docs.filter((doc: any) => {
+        const status = doc.data().status;
+        return status === 'pending';
+      }).length;
     } catch (e: any) {
       console.log('Error counting pending reviews:', e.message);
     }

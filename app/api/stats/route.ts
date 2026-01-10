@@ -54,8 +54,12 @@ export async function GET(request: NextRequest) {
     }
     
     try {
-      const reviewsCount = await db.collection('reviews').where('status', '==', 'pending').count().get();
-      pendingReviews = reviewsCount.data().count;
+      // Fetch all and filter locally (avoid index issues)
+      const reviewsSnapshot = await db.collection('reviews').limit(200).get();
+      pendingReviews = reviewsSnapshot.docs.filter((doc: any) => {
+        const status = doc.data().status;
+        return status === 'pending';
+      }).length;
     } catch (e) {
       // Collection might not exist
     }
