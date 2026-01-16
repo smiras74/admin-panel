@@ -78,6 +78,14 @@ function ModerationContent() {
   const [activeTab, setActiveTab] = useState<Tab>((searchParams.get('tab') as Tab) || 'pois');
   const [pois, setPois] = useState<PendingPOI[]>([]);
   const [edits, setEdits] = useState<PendingEdit[]>([]);
+
+  // Sync activeTab with URL parameter
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab') as Tab;
+    if (tabFromUrl && ['pois', 'edits', 'reviews'].includes(tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [searchParams]);
   const [reviews, setReviews] = useState<PendingReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);

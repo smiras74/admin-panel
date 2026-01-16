@@ -13,20 +13,24 @@ export async function GET(request: NextRequest) {
       reviews: [],
     };
 
-    // Pending POIs (custom_pois with status=pending)
+    // Pending POIs - check both 'custom_pois' and 'pois' collections
     if (type === 'all' || type === 'pois') {
+      const allPendingPois: any[] = [];
+      
+      // Check custom_pois collection (user-submitted)
       try {
-        const poisSnapshot = await db.collection('custom_pois')
+        const customPoisSnapshot = await db.collection('custom_pois')
           .where('status', '==', 'pending')
           .orderBy('createdAt', 'desc')
           .limit(100)
           .get();
 
-        results.pois = poisSnapshot.docs.map((doc: any) => {
+        customPoisSnapshot.docs.forEach((doc: any) => {
           const data = doc.data();
-          return {
+          allPendingPois.push({
             id: doc.id,
             type: 'new_poi',
+            collection: 'custom_pois',
             name: data.name || 'Sans nom',
             description: data.description || '',
             category: data.category || '',
@@ -37,11 +41,48 @@ export async function GET(request: NextRequest) {
             userId: data.createdBy || data.userId,
             status: data.status,
             createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
-          };
+          });
         });
       } catch (e) {
-        console.log('No pending POIs or index needed');
+        console.log('No pending custom_pois or index needed');
       }
+      
+      // Also check main 'pois' collection
+      try {
+        const poisSnapshot = await db.collection('pois')
+          .where('status', '==', 'pending')
+          .orderBy('createdAt', 'desc')
+          .limit(100)
+          .get();
+
+        poisSnapshot.docs.forEach((doc: any) => {
+          const data = doc.data();
+          allPendingPois.push({
+            id: doc.id,
+            type: 'new_poi',
+            collection: 'pois',
+            name: data.name || 'Sans nom',
+            description: data.description || '',
+            category: data.category || '',
+            subcategory: data.subcategory || '',
+            latitude: data.latitude || data.coordinate?._latitude,
+            longitude: data.longitude || data.coordinate?._longitude,
+            photoUrls: data.photoUrls || (data.photoUrl ? [data.photoUrl] : []),
+            userId: data.createdBy || data.userId,
+            status: data.status,
+            createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
+          });
+        });
+      } catch (e) {
+        console.log('No pending pois or index needed');
+      }
+      
+      // Sort by date and assign to results
+      results.pois = allPendingPois.sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      });
     }
 
     // Pending edits (poi_edits with status=pending)
@@ -165,7 +206,7 @@ export async function POST(request: NextRequest) {
     const { db } = getFirebaseAdmin();
     const body = await request.json();
     
-    const { id, type, action, poiId, poiCollection, changes } = body;
+    const { id, type, action, poiId, poiCollection, changes, collection } = body;
     
     if (!id || !type || !action) {
       return NextResponse.json(
@@ -176,39 +217,47 @@ export async function POST(request: NextRequest) {
 
     if (action === 'approve') {
       if (type === 'new_poi') {
-        // Approve new POI - copy to main 'pois' collection with status 'published'
-        const pendingDoc = await db.collection('custom_pois').doc(id).get();
+        // Determine source collection (from request or default to custom_pois)
+        const sourceCollection = collection || 'custom_pois';
         
-        if (pendingDoc.exists) {
-          const poiData = pendingDoc.data();
-          
-          // Prepare data for main collection
-          const publishedData = {
-            ...poiData,
+        if (sourceCollection === 'pois') {
+          // POI is already in 'pois' collection, just update status
+          await db.collection('pois').doc(id).update({
             status: 'published',
             approvedAt: new Date(),
             approvedByAdmin: true,
             publishedAt: new Date(),
-            // Ensure coordinate format for geoqueries
-            coordinate: poiData?.latitude && poiData?.longitude 
-              ? new (require('firebase-admin').firestore.GeoPoint)(poiData.latitude, poiData.longitude)
-              : null,
-          };
-          
-          // Copy to main pois collection
-          await db.collection('pois').doc(id).set(publishedData);
-          
-          // Update status in custom_pois
-          await db.collection('custom_pois').doc(id).update({
-            status: 'approved',
-            approvedAt: new Date(),
-            approvedByAdmin: true,
           });
+        } else {
+          // POI is in custom_pois, copy to main 'pois' collection
+          const pendingDoc = await db.collection(sourceCollection).doc(id).get();
           
-          // TODO: Award XP to user (+30 or +50 if has photo)
-          // const userId = poiData?.createdBy;
-          // const hasPhoto = poiData?.photoUrls?.length > 0;
-          // const xpReward = hasPhoto ? 50 : 30;
+          if (pendingDoc.exists) {
+            const poiData = pendingDoc.data();
+            
+            // Prepare data for main collection
+            const publishedData = {
+              ...poiData,
+              status: 'published',
+              approvedAt: new Date(),
+              approvedByAdmin: true,
+              publishedAt: new Date(),
+              // Ensure coordinate format for geoqueries
+              coordinate: poiData?.latitude && poiData?.longitude 
+                ? new (require('firebase-admin').firestore.GeoPoint)(poiData.latitude, poiData.longitude)
+                : null,
+            };
+            
+            // Copy to main pois collection
+            await db.collection('pois').doc(id).set(publishedData);
+            
+            // Update status in source collection
+            await db.collection(sourceCollection).doc(id).update({
+              status: 'approved',
+              approvedAt: new Date(),
+              approvedByAdmin: true,
+            });
+          }
         }
       } else if (type === 'edit') {
         // Approve edit - apply changes to original POI

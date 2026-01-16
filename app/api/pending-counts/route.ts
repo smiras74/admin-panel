@@ -17,12 +17,19 @@ export async function GET(request: NextRequest) {
       total: 0,
     };
 
-    // Pending POIs (pois with status=pending)
+    // Pending POIs - check both 'pois' and 'custom_pois' collections
     try {
+      // Check main 'pois' collection
       const poisSnapshot = await db.collection('pois')
         .where('status', '==', 'pending')
         .get();
       counts.pois = poisSnapshot.size;
+      
+      // Also check 'custom_pois' collection (user-submitted POIs)
+      const customPoisSnapshot = await db.collection('custom_pois')
+        .where('status', '==', 'pending')
+        .get();
+      counts.pois += customPoisSnapshot.size;
     } catch (e: any) {
       console.log('Error counting pending POIs:', e.message);
     }
