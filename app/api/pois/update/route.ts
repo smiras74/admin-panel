@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
     const subcategory = updates?.subcategory ?? body.subcategory;
     const photoUrls = updates?.photoUrls ?? body.photoUrls;
     const newStatus = updates?.status ?? body.status;
+    const openingHours = updates?.openingHours ?? body.openingHours;
     
     console.log('Update POI request:', { id, source, name, description: description?.substring(0, 50), photoUrls: photoUrls?.length });
     
@@ -82,6 +83,11 @@ export async function POST(request: NextRequest) {
       } else {
         updateData.photoUrl = '';
       }
+    }
+
+    // Opening hours
+    if (openingHours !== undefined) {
+      updateData.openingHours = openingHours;
     }
 
     // Allow status update (e.g., verify a cached POI)
