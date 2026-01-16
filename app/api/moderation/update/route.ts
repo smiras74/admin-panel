@@ -60,6 +60,9 @@ export async function POST(request: NextRequest) {
     if (updates.subcategory !== undefined) {
       cleanUpdates.subcategory = updates.subcategory.trim();
     }
+    if (updates.openingHours !== undefined) {
+      cleanUpdates.openingHours = updates.openingHours.trim();
+    }
 
     // Add modification timestamp
     cleanUpdates.modifiedAt = new Date();

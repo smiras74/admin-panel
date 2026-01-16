@@ -27,6 +27,7 @@ interface PendingPOI {
   description?: string;
   category?: string;
   subcategory?: string;
+  openingHours?: string;
   latitude?: number;
   longitude?: number;
   photoUrls?: string[];
@@ -97,6 +98,7 @@ function ModerationContent() {
     description: '',
     category: '',
     subcategory: '',
+    openingHours: '',
   });
   const [saving, setSaving] = useState(false);
 
@@ -185,6 +187,7 @@ function ModerationContent() {
       description: poi.description || '',
       category: poi.category || '',
       subcategory: poi.subcategory || '',
+      openingHours: poi.openingHours || '',
     });
   };
 
@@ -679,6 +682,18 @@ function ModerationContent() {
                   onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
                   rows={5}
                   className="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg text-gray-100 focus:border-forest-500 focus:outline-none resize-none"
+                />
+              </div>
+
+              {/* Opening Hours */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Horaires d'ouverture</label>
+                <input
+                  type="text"
+                  value={editForm.openingHours}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, openingHours: e.target.value }))}
+                  className="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg text-gray-100 focus:border-forest-500 focus:outline-none"
+                  placeholder="Ex: Mar-Sam 10h-18h"
                 />
               </div>
             </div>
