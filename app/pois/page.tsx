@@ -396,6 +396,52 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
     }
   };
 
+  // Compress image on client side before upload
+  const compressImage = async (file: File, maxWidth = 1920, quality = 0.8): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        // Calculate new dimensions
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        
+        // Create canvas and draw resized image
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Failed to get canvas context'));
+          return;
+        }
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Convert to blob
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Failed to compress image'));
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   // Upload photo file
   const handleUploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -413,12 +459,23 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
           continue;
         }
         if (file.size > 50 * 1024 * 1024) {
-          alert(`${file.name} est trop volumineux (max 50MB, sera compressé automatiquement)`);
+          alert(`${file.name} est trop volumineux (max 50MB)`);
           continue;
         }
 
+        // Compress image on client side to avoid Vercel payload limit
+        let fileToUpload: Blob | File = file;
+        try {
+          console.log(`Compressing ${file.name}: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+          fileToUpload = await compressImage(file);
+          console.log(`Compressed to: ${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB`);
+        } catch (compressError) {
+          console.warn('Client compression failed, uploading original:', compressError);
+          // If compression fails, try uploading original (might fail if too large)
+        }
+
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('file', fileToUpload, file.name);
         formData.append('poiId', editingPoi.id);
 
         const response = await fetch('/api/upload', {

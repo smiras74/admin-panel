@@ -295,10 +295,11 @@ export async function POST(request: NextRequest) {
         });
       }
     } else if (action === 'reject') {
-      const collection = type === 'new_poi' ? 'custom_pois' : 
-                        type === 'edit' ? 'poi_edits' : 'reviews';
+      // Use collection from request for new_poi, otherwise determine from type
+      const rejectCollection = type === 'new_poi' ? (collection || 'custom_pois') : 
+                              type === 'edit' ? 'poi_edits' : 'reviews';
       
-      await db.collection(collection).doc(id).update({
+      await db.collection(rejectCollection).doc(id).update({
         status: 'rejected',
         rejectedAt: new Date(),
         rejectedByAdmin: true,

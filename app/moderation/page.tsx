@@ -22,6 +22,7 @@ import { Navigation } from '@/components/Navigation';
 interface PendingPOI {
   id: string;
   type: 'new_poi';
+  collection?: string; // 'pois' or 'custom_pois'
   name: string;
   description?: string;
   category?: string;
@@ -124,7 +125,7 @@ function ModerationContent() {
     id: string, 
     type: 'new_poi' | 'edit' | 'review', 
     action: 'approve' | 'reject',
-    extra?: { poiId?: string; poiCollection?: string; changes?: any }
+    extra?: { poiId?: string; poiCollection?: string; changes?: any; collection?: string }
   ) => {
     setProcessing(id);
     try {
@@ -292,7 +293,7 @@ function ModerationContent() {
 
                           <div className="flex gap-2 mt-3 sm:mt-0">
                             <button
-                              onClick={() => handleAction(poi.id, 'new_poi', 'approve')}
+                              onClick={() => handleAction(poi.id, 'new_poi', 'approve', { collection: poi.collection })}
                               disabled={processing === poi.id}
                               className="flex-1 sm:flex-initial flex items-center justify-center gap-2 p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
                             >
@@ -304,7 +305,7 @@ function ModerationContent() {
                               <span className="sm:hidden">Approuver</span>
                             </button>
                             <button
-                              onClick={() => handleAction(poi.id, 'new_poi', 'reject')}
+                              onClick={() => handleAction(poi.id, 'new_poi', 'reject', { collection: poi.collection })}
                               disabled={processing === poi.id}
                               className="flex-1 sm:flex-initial flex items-center justify-center gap-2 p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
                             >
