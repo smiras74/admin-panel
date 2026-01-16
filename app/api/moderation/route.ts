@@ -21,7 +21,6 @@ export async function GET(request: NextRequest) {
       try {
         const customPoisSnapshot = await db.collection('custom_pois')
           .where('status', '==', 'pending')
-          .orderBy('createdAt', 'desc')
           .limit(100)
           .get();
 
@@ -43,15 +42,15 @@ export async function GET(request: NextRequest) {
             createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
           });
         });
-      } catch (e) {
-        console.log('No pending custom_pois or index needed');
+        console.log(`Found ${customPoisSnapshot.size} pending custom_pois`);
+      } catch (e: any) {
+        console.log('Error fetching custom_pois:', e.message);
       }
       
       // Also check main 'pois' collection
       try {
         const poisSnapshot = await db.collection('pois')
           .where('status', '==', 'pending')
-          .orderBy('createdAt', 'desc')
           .limit(100)
           .get();
 
@@ -73,16 +72,12 @@ export async function GET(request: NextRequest) {
             createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
           });
         });
-      } catch (e) {
-        console.log('No pending pois or index needed');
+        console.log(`Found ${poisSnapshot.size} pending pois`);
+      } catch (e: any) {
+        console.log('Error fetching pois:', e.message);
       }
       
-      // Sort by date and assign to results
-      results.pois = allPendingPois.sort((a, b) => {
-        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return dateB - dateA;
-      });
+      results.pois = allPendingPois;
     }
 
     // Pending edits (poi_edits with status=pending)
@@ -90,9 +85,10 @@ export async function GET(request: NextRequest) {
       try {
         const editsSnapshot = await db.collection('poi_edits')
           .where('status', '==', 'pending')
-          .orderBy('createdAt', 'desc')
           .limit(100)
           .get();
+
+        console.log(`Found ${editsSnapshot.size} pending edits`);
 
         // For each edit, fetch the original POI to show diff
         const editsWithOriginal = await Promise.all(
@@ -150,9 +146,10 @@ export async function GET(request: NextRequest) {
       try {
         const reviewsSnapshot = await db.collection('reviews')
           .where('status', '==', 'pending')
-          .orderBy('createdAt', 'desc')
           .limit(100)
           .get();
+
+        console.log(`Found ${reviewsSnapshot.size} pending reviews`);
 
         results.reviews = reviewsSnapshot.docs.map((doc: any) => {
           const data = doc.data();
@@ -184,10 +181,21 @@ export async function GET(request: NextRequest) {
             createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
           };
         });
-      } catch (e) {
-        console.log('No pending reviews or index needed');
+      } catch (e: any) {
+        console.log('Error fetching reviews:', e.message);
       }
     }
+
+    // Sort all results by date (newest first)
+    const sortByDate = (a: any, b: any) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    };
+    
+    results.pois.sort(sortByDate);
+    results.edits.sort(sortByDate);
+    results.reviews.sort(sortByDate);
 
     return NextResponse.json(results);
 
