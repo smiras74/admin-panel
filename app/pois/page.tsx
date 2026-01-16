@@ -412,8 +412,8 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
           alert(`${file.name} n'est pas une image`);
           continue;
         }
-        if (file.size > 5 * 1024 * 1024) {
-          alert(`${file.name} est trop volumineux (max 5MB)`);
+        if (file.size > 50 * 1024 * 1024) {
+          alert(`${file.name} est trop volumineux (max 50MB, sera compressé automatiquement)`);
           continue;
         }
 
@@ -1089,7 +1089,7 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
                     {uploading ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
-                        <span className="text-sm text-gray-400">Upload en cours...</span>
+                        <span className="text-sm text-gray-400">Compression et upload en cours...</span>
                       </>
                     ) : (
                       <>
@@ -1099,14 +1099,14 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
                     )}
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/*,.heic,.heif"
                       multiple
                       onChange={handleUploadPhoto}
                       disabled={uploading}
                       className="hidden"
                     />
                   </label>
-                  <p className="text-xs text-gray-500 mt-1.5 text-center">JPG, PNG, WebP • Max 5MB par fichier</p>
+                  <p className="text-xs text-gray-500 mt-1.5 text-center">JPG, PNG, WebP, HEIC • Auto-compression activée</p>
                 </div>
               </div>
 
