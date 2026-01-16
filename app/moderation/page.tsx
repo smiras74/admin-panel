@@ -76,17 +76,14 @@ function ModerationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const [activeTab, setActiveTab] = useState<Tab>((searchParams.get('tab') as Tab) || 'pois');
+  // Use URL as single source of truth for active tab
+  const tabFromUrl = searchParams.get('tab') as Tab;
+  const activeTab: Tab = (tabFromUrl && ['pois', 'edits', 'reviews'].includes(tabFromUrl)) 
+    ? tabFromUrl 
+    : 'pois';
+  
   const [pois, setPois] = useState<PendingPOI[]>([]);
   const [edits, setEdits] = useState<PendingEdit[]>([]);
-
-  // Sync activeTab with URL parameter
-  useEffect(() => {
-    const tabFromUrl = searchParams.get('tab') as Tab;
-    if (tabFromUrl && ['pois', 'edits', 'reviews'].includes(tabFromUrl)) {
-      setActiveTab(tabFromUrl);
-    }
-  }, [searchParams]);
   const [reviews, setReviews] = useState<PendingReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
@@ -206,7 +203,7 @@ function ModerationContent() {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => router.push(`/moderation?tab=${tab.id}`)}
                   className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg transition-all whitespace-nowrap shrink-0 ${
                     activeTab === tab.id
                       ? 'bg-forest-600 text-white'
