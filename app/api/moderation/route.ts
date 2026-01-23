@@ -125,17 +125,39 @@ export async function GET(request: NextRequest) {
               }
             }
 
+            // Merge changes from data.changes object AND root-level fields
+            // Mobile app may store fields at root level or inside changes object
+            const changes: any = {};
+
+            // Check data.changes first
+            if (data.changes) {
+              if (data.changes.name !== undefined) changes.name = data.changes.name;
+              if (data.changes.description !== undefined) changes.description = data.changes.description;
+              if (data.changes.category !== undefined) changes.category = data.changes.category;
+              if (data.changes.subcategory !== undefined) changes.subcategory = data.changes.subcategory;
+              if (data.changes.openingHours !== undefined) changes.openingHours = data.changes.openingHours;
+              if (data.changes.latitude !== undefined) changes.latitude = data.changes.latitude;
+              if (data.changes.longitude !== undefined) changes.longitude = data.changes.longitude;
+              if (data.changes.photoUrls !== undefined) changes.photoUrls = data.changes.photoUrls;
+            }
+
+            // Also check root-level fields (fallback for older mobile app versions)
+            if (changes.name === undefined && data.name !== undefined) changes.name = data.name;
+            if (changes.description === undefined && data.description !== undefined) changes.description = data.description;
+            if (changes.category === undefined && data.category !== undefined) changes.category = data.category;
+            if (changes.subcategory === undefined && data.subcategory !== undefined) changes.subcategory = data.subcategory;
+            if (changes.openingHours === undefined && data.openingHours !== undefined) changes.openingHours = data.openingHours;
+            if (changes.latitude === undefined && data.latitude !== undefined) changes.latitude = data.latitude;
+            if (changes.longitude === undefined && data.longitude !== undefined) changes.longitude = data.longitude;
+            if (changes.photoUrls === undefined && data.photoUrls !== undefined) changes.photoUrls = data.photoUrls;
+
             return {
               id: doc.id,
               type: 'edit',
               poiId: data.poiId,
               poiCollection: poiCollection,
               poiName: data.poiName || original?.name || 'POI inconnu',
-              changes: data.changes || {
-                name: data.name,
-                description: data.description,
-                photoUrls: data.photoUrls,
-              },
+              changes: changes,
               original: original,
               userId: data.userId || data.createdBy,
               status: data.status,
