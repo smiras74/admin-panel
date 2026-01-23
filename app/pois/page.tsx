@@ -241,28 +241,35 @@ function POIsContent() {
   // Load POI for editing from URL parameter
   useEffect(() => {
     const loadPoiForEdit = async () => {
-      if (!editPoiId || !user || editingPoi?.id === editPoiId) return;
+      // Skip if no edit param, no user, or already editing this POI
+      if (!editPoiId || !user) return;
+      if (editingPoi && editingPoi.id === editPoiId) return;
+
+      console.log('Loading POI for edit:', editPoiId, 'from collection:', editCollection);
 
       try {
-        // Fetch the specific POI from Firestore via a new API endpoint
+        // Fetch the specific POI from Firestore via API endpoint
         const response = await fetch(`/api/pois/get?id=${editPoiId}&collection=${editCollection}`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.poi) {
-            setEditingPoi(data.poi);
-          }
+        const data = await response.json();
+
+        console.log('API response:', response.status, data);
+
+        if (response.ok && data.poi) {
+          setEditingPoi(data.poi);
         } else {
-          console.error('POI not found');
-          // Clear the URL params if POI not found
+          console.error('POI not found:', data.error);
+          alert(`POI non trouvé: ${data.error || 'Erreur inconnue'}`);
           router.replace('/pois');
         }
       } catch (error) {
         console.error('Error fetching POI for edit:', error);
+        alert('Erreur lors du chargement du POI');
+        router.replace('/pois');
       }
     };
 
     loadPoiForEdit();
-  }, [editPoiId, editCollection, user, router, editingPoi?.id]);
+  }, [editPoiId, editCollection, user, router, editingPoi]);
 
   // Clear URL params when closing edit modal
   const handleCloseEdit = () => {
