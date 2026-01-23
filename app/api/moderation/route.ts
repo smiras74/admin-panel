@@ -99,30 +99,47 @@ export async function GET(request: NextRequest) {
           editsSnapshot.docs.map(async (doc: any) => {
             const data = doc.data();
             
-            // Fetch original POI
+            // Fetch original POI - search across multiple collections if needed
             let original = null;
-            const poiCollection = data.poiCollection || 'cached_pois';
+            let poiCollection = data.poiCollection || null;
             const poiId = data.poiId;
-            
+
             if (poiId) {
-              try {
-                const originalDoc = await db.collection(poiCollection).doc(poiId).get();
-                if (originalDoc.exists) {
-                  const origData = originalDoc.data();
-                  original = {
-                    name: origData?.name || '',
-                    description: origData?.description || origData?.shortDescription || '',
-                    category: origData?.category || '',
-                    subcategory: origData?.subcategory || '',
-                    openingHours: origData?.openingHours || '',
-                    latitude: origData?.latitude || origData?.coordinate?._latitude,
-                    longitude: origData?.longitude || origData?.coordinate?._longitude,
-                    photoUrls: origData?.photoUrls || (origData?.photoUrl ? [origData.photoUrl] : []),
-                  };
+              // Collections to search (in order of priority)
+              const collectionsToSearch = poiCollection
+                ? [poiCollection]
+                : ['pois', 'cached_pois', 'custom_pois', 'verified_pois'];
+
+              for (const collectionName of collectionsToSearch) {
+                try {
+                  const originalDoc = await db.collection(collectionName).doc(poiId).get();
+                  if (originalDoc.exists) {
+                    const origData = originalDoc.data();
+                    original = {
+                      name: origData?.name || '',
+                      description: origData?.description || origData?.shortDescription || '',
+                      category: origData?.category || '',
+                      subcategory: origData?.subcategory || '',
+                      openingHours: origData?.openingHours || '',
+                      latitude: origData?.latitude || origData?.coordinate?._latitude,
+                      longitude: origData?.longitude || origData?.coordinate?._longitude,
+                      photoUrls: origData?.photoUrls || (origData?.photoUrl ? [origData.photoUrl] : []),
+                    };
+                    poiCollection = collectionName; // Remember where we found it
+                    console.log(`Found POI ${poiId} in collection: ${collectionName}`);
+                    break;
+                  }
+                } catch (e) {
+                  console.log(`Could not fetch POI from ${collectionName}`);
                 }
-              } catch (e) {
-                console.log('Could not fetch original POI');
               }
+
+              // Fallback if not found
+              if (!poiCollection) {
+                poiCollection = 'pois';
+              }
+            } else {
+              poiCollection = poiCollection || 'pois';
             }
 
             // Collect changes from various field naming conventions
