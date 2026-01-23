@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 
+export const dynamic = 'force-dynamic';
+
 // POST - Update a pending POI before approval
 export async function POST(request: NextRequest) {
   try {
