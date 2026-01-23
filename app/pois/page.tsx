@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   Search, 
   MapPin,
@@ -116,17 +116,22 @@ const SORT_OPTIONS = [
   { value: 'createdAt', label: 'Plus anciens' },
 ];
 
-export default function POIsPage() {
+function POIsContent() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  
+  const searchParams = useSearchParams();
+
   const [pois, setPois] = useState<POI[]>([]);
   const [counts, setCounts] = useState<Counts>({ total: 0 });
   const [contentStats, setContentStats] = useState<ContentStats>({ withPhoto: 0, withDescription: 0, complete: 0, empty: 0 });
   const [subcategories, setSubcategories] = useState<string[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
-  
+
+  // URL params for direct edit
+  const editPoiId = searchParams.get('edit');
+  const editCollection = searchParams.get('collection') || 'pois';
+
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [sourceFilter, setSourceFilter] = useState('all');
@@ -233,6 +238,41 @@ export default function POIsPage() {
     return () => clearTimeout(debounce);
   }, [fetchPOIs]);
 
+  // Load POI for editing from URL parameter
+  useEffect(() => {
+    const loadPoiForEdit = async () => {
+      if (!editPoiId || !user || editingPoi?.id === editPoiId) return;
+
+      try {
+        // Fetch the specific POI from Firestore via a new API endpoint
+        const response = await fetch(`/api/pois/get?id=${editPoiId}&collection=${editCollection}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.poi) {
+            setEditingPoi(data.poi);
+          }
+        } else {
+          console.error('POI not found');
+          // Clear the URL params if POI not found
+          router.replace('/pois');
+        }
+      } catch (error) {
+        console.error('Error fetching POI for edit:', error);
+      }
+    };
+
+    loadPoiForEdit();
+  }, [editPoiId, editCollection, user, router, editingPoi?.id]);
+
+  // Clear URL params when closing edit modal
+  const handleCloseEdit = () => {
+    setEditingPoi(null);
+    // Clear URL params
+    if (editPoiId) {
+      router.replace('/pois');
+    }
+  };
+
   // Save POI changes
   const handleSave = async () => {
     if (!editingPoi) return;
@@ -257,7 +297,7 @@ export default function POIsPage() {
       });
 
       if (response.ok) {
-        setEditingPoi(null);
+        handleCloseEdit();
         fetchPOIs();
       } else {
         const error = await response.json();
@@ -532,7 +572,7 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
       });
 
       if (response.ok) {
-        setEditingPoi(null);
+        handleCloseEdit();
         setShowDeleteConfirm(false);
         fetchPOIs();
       } else {
@@ -962,8 +1002,8 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
 
       {/* Full Edit Modal */}
       {editingPoi && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setEditingPoi(null)}>
-          <div 
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={handleCloseEdit}>
+          <div
             className="bg-gray-800 rounded-xl border border-gray-700 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
@@ -974,7 +1014,7 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
                 <p className="text-xs text-gray-500 font-mono mt-0.5">{editingPoi.id}</p>
               </div>
               <button
-                onClick={() => setEditingPoi(null)}
+                onClick={handleCloseEdit}
                 className="p-2 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded-lg"
               >
                 <X className="w-5 h-5" />
@@ -1204,7 +1244,7 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
               
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => setEditingPoi(null)}
+                  onClick={handleCloseEdit}
                   className="px-4 py-2 text-gray-300 hover:text-gray-100 transition-all"
                 >
                   Annuler
@@ -1316,5 +1356,17 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
         </div>
       )}
     </div>
+  );
+}
+
+export default function POIsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <Loader2 className="w-8 h-8 animate-spin text-forest-500" />
+      </div>
+    }>
+      <POIsContent />
+    </Suspense>
   );
 }

@@ -112,16 +112,12 @@ function ModerationContent() {
   });
   const [saving, setSaving] = useState(false);
 
-  // Editing state for POI edits (modifications)
-  const [editingEdit, setEditingEdit] = useState<PendingEdit | null>(null);
-  const [editEditForm, setEditEditForm] = useState({
-    name: '',
-    description: '',
-    category: '',
-    subcategory: '',
-    openingHours: '',
-    photoUrls: [] as string[],
-  });
+  // Handler to approve edit and redirect to POI page for full editing
+  const handleApproveAndRedirect = (edit: PendingEdit) => {
+    // Navigate to POIs page with edit mode for this POI
+    router.push(`/pois?edit=${edit.poiId}&collection=${edit.poiCollection || 'pois'}`);
+  };
+
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -260,65 +256,6 @@ function ModerationContent() {
     }
   };
 
-  // Open edit modal for POI modifications
-  const openEditEditModal = (edit: PendingEdit) => {
-    setEditingEdit(edit);
-    // Pre-fill with new values (changes), fallback to original
-    setEditEditForm({
-      name: edit.changes.name ?? edit.original?.name ?? '',
-      description: edit.changes.description ?? edit.original?.description ?? '',
-      category: edit.changes.category ?? edit.original?.category ?? '',
-      subcategory: edit.changes.subcategory ?? edit.original?.subcategory ?? '',
-      openingHours: edit.changes.openingHours ?? edit.original?.openingHours ?? '',
-      photoUrls: edit.changes.photoUrls ?? edit.original?.photoUrls ?? [],
-    });
-  };
-
-  // Approve POI edit with modifications
-  const handleApproveEdit = async () => {
-    if (!editingEdit) return;
-
-    setSaving(true);
-    try {
-      // Build changes object from form
-      const changes: any = {};
-      if (editEditForm.name !== editingEdit.original?.name) changes.name = editEditForm.name;
-      if (editEditForm.description !== editingEdit.original?.description) changes.description = editEditForm.description;
-      if (editEditForm.category !== editingEdit.original?.category) changes.category = editEditForm.category;
-      if (editEditForm.subcategory !== editingEdit.original?.subcategory) changes.subcategory = editEditForm.subcategory;
-      if (editEditForm.openingHours !== editingEdit.original?.openingHours) changes.openingHours = editEditForm.openingHours;
-      if (JSON.stringify(editEditForm.photoUrls) !== JSON.stringify(editingEdit.original?.photoUrls)) {
-        changes.photoUrls = editEditForm.photoUrls;
-      }
-
-      const response = await fetch('/api/moderation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: editingEdit.id,
-          type: 'edit',
-          action: 'approve',
-          poiId: editingEdit.poiId,
-          poiCollection: editingEdit.poiCollection || 'pois',
-          changes: changes,
-        }),
-      });
-
-      if (response.ok) {
-        setEdits(prev => prev.filter(e => e.id !== editingEdit.id));
-        setEditingEdit(null);
-        window.dispatchEvent(new Event('refresh-pending-counts'));
-      } else {
-        const error = await response.json();
-        alert('Erreur: ' + (error.error || 'Échec de l\'approbation'));
-      }
-    } catch (error) {
-      console.error('Error approving edit:', error);
-      alert('Erreur lors de l\'approbation');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   if (authLoading || !user) {
     return (
@@ -678,11 +615,11 @@ function ModerationContent() {
 
                             <div className="flex gap-2 pt-4 border-t border-gray-700">
                               <button
-                                onClick={() => openEditEditModal(edit)}
-                                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                                onClick={() => handleApproveAndRedirect(edit)}
+                                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-forest-600 text-white rounded-lg hover:bg-forest-700"
                               >
-                                <Check className="w-4 h-4" />
-                                Approuver
+                                <ExternalLink className="w-4 h-4" />
+                                Modifier le POI
                               </button>
                               <button
                                 onClick={() => handleAction(edit.id, 'edit', 'reject')}
@@ -890,125 +827,6 @@ function ModerationContent() {
         </div>
       )}
 
-      {/* Edit Modal for POI Modifications */}
-      {editingEdit && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-xl border border-gray-700 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b border-gray-700">
-              <h2 className="text-lg font-medium text-gray-100">Valider la modification</h2>
-              <button
-                onClick={() => setEditingEdit(null)}
-                className="text-gray-400 hover:text-gray-200"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-4 space-y-4">
-              {/* Photos preview */}
-              {editEditForm.photoUrls.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Photos</label>
-                  <div className="flex gap-2 flex-wrap">
-                    {editEditForm.photoUrls.map((url, i) => (
-                      <img
-                        key={i}
-                        src={url}
-                        alt={`Photo ${i + 1}`}
-                        className="w-24 h-24 object-cover rounded-lg border border-gray-600"
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Nom</label>
-                <input
-                  type="text"
-                  value={editEditForm.name}
-                  onChange={(e) => setEditEditForm(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg text-gray-100 focus:border-forest-500 focus:outline-none"
-                />
-              </div>
-
-              {/* Category */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Catégorie</label>
-                  <select
-                    value={editEditForm.category}
-                    onChange={(e) => setEditEditForm(prev => ({ ...prev, category: e.target.value }))}
-                    className="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg text-gray-100 focus:border-forest-500 focus:outline-none"
-                  >
-                    <option value="">Sélectionner</option>
-                    <option value="culture">Culture</option>
-                    <option value="gastro">Gastronomie</option>
-                    <option value="nature">Nature</option>
-                    <option value="curiosites">Curiosités</option>
-                    <option value="hedonisme">Hédonisme</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Sous-catégorie</label>
-                  <input
-                    type="text"
-                    value={editEditForm.subcategory}
-                    onChange={(e) => setEditEditForm(prev => ({ ...prev, subcategory: e.target.value }))}
-                    className="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg text-gray-100 focus:border-forest-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Description</label>
-                <textarea
-                  value={editEditForm.description}
-                  onChange={(e) => setEditEditForm(prev => ({ ...prev, description: e.target.value }))}
-                  rows={4}
-                  className="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg text-gray-100 focus:border-forest-500 focus:outline-none resize-none"
-                />
-              </div>
-
-              {/* Opening Hours */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Horaires d'ouverture</label>
-                <input
-                  type="text"
-                  value={editEditForm.openingHours}
-                  onChange={(e) => setEditEditForm(prev => ({ ...prev, openingHours: e.target.value }))}
-                  className="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg text-gray-100 focus:border-forest-500 focus:outline-none"
-                  placeholder="Ex: Mar-Sam 10h-18h"
-                />
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-3 p-4 border-t border-gray-700">
-              <button
-                onClick={() => setEditingEdit(null)}
-                className="flex-1 p-3 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={handleApproveEdit}
-                disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 p-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-              >
-                {saving ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Check className="w-4 h-4" />
-                )}
-                Approuver
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
