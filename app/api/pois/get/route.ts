@@ -27,9 +27,46 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const doc = await db.collection(collection).doc(id).get();
+    // Try multiple ID formats (OSM IDs can be stored as node/123, way/123, or just 123)
+    const idVariants = [
+      id,
+      `node/${id}`,
+      `way/${id}`,
+      `relation/${id}`,
+    ];
 
-    if (!doc.exists) {
+    let doc = null;
+    let foundInCollection = collection;
+
+    // First try the specified collection
+    for (const idVariant of idVariants) {
+      const tryDoc = await db.collection(collection).doc(idVariant).get();
+      if (tryDoc.exists) {
+        doc = tryDoc;
+        console.log(`Found POI with ID ${idVariant} in ${collection}`);
+        break;
+      }
+    }
+
+    // If not found in specified collection, try other collections
+    if (!doc) {
+      for (const otherCollection of validCollections) {
+        if (otherCollection === collection) continue;
+        for (const idVariant of idVariants) {
+          const tryDoc = await db.collection(otherCollection).doc(idVariant).get();
+          if (tryDoc.exists) {
+            doc = tryDoc;
+            foundInCollection = otherCollection;
+            console.log(`Found POI with ID ${idVariant} in ${otherCollection}`);
+            break;
+          }
+        }
+        if (doc) break;
+      }
+    }
+
+    if (!doc || !doc.exists) {
+      console.log(`POI not found. Tried IDs: ${idVariants.join(', ')} in collections: ${validCollections.join(', ')}`);
       return NextResponse.json(
         { error: 'POI not found' },
         { status: 404 }
