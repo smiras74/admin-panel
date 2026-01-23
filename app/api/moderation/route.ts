@@ -125,40 +125,72 @@ export async function GET(request: NextRequest) {
               }
             }
 
-            // Merge changes from data.changes object AND root-level fields
-            // Mobile app may store fields at root level or inside changes object
+            // Collect changes from various field naming conventions
+            // iOS app uses: newName, newDescription, newSubcategory, newPhotoUrl, etc.
+            // Also support: data.changes object and direct fields
             const changes: any = {};
 
-            // Check data.changes first
-            if (data.changes) {
-              if (data.changes.name !== undefined) changes.name = data.changes.name;
-              if (data.changes.description !== undefined) changes.description = data.changes.description;
-              if (data.changes.category !== undefined) changes.category = data.changes.category;
-              if (data.changes.subcategory !== undefined) changes.subcategory = data.changes.subcategory;
-              if (data.changes.openingHours !== undefined) changes.openingHours = data.changes.openingHours;
-              if (data.changes.latitude !== undefined) changes.latitude = data.changes.latitude;
-              if (data.changes.longitude !== undefined) changes.longitude = data.changes.longitude;
-              if (data.changes.photoUrls !== undefined) changes.photoUrls = data.changes.photoUrls;
+            // iOS format: newXxx fields (only if value is not null)
+            if (data.newName !== undefined && data.newName !== null) changes.name = data.newName;
+            if (data.newDescription !== undefined && data.newDescription !== null) changes.description = data.newDescription;
+            if (data.newCategory !== undefined && data.newCategory !== null) changes.category = data.newCategory;
+            if (data.newSubcategory !== undefined && data.newSubcategory !== null) changes.subcategory = data.newSubcategory;
+            if (data.newOpeningHours !== undefined && data.newOpeningHours !== null) changes.openingHours = data.newOpeningHours;
+            // Handle photo: iOS uses newPhotoUrl (single) or newPhotoUrls (array)
+            if (data.newPhotoUrls !== undefined && data.newPhotoUrls !== null) {
+              changes.photoUrls = data.newPhotoUrls;
+            } else if (data.newPhotoUrl !== undefined && data.newPhotoUrl !== null) {
+              changes.photoUrls = [data.newPhotoUrl];
             }
 
-            // Also check root-level fields (fallback for older mobile app versions)
+            // Check data.changes object (alternative format)
+            if (data.changes) {
+              if (changes.name === undefined && data.changes.name !== undefined) changes.name = data.changes.name;
+              if (changes.description === undefined && data.changes.description !== undefined) changes.description = data.changes.description;
+              if (changes.category === undefined && data.changes.category !== undefined) changes.category = data.changes.category;
+              if (changes.subcategory === undefined && data.changes.subcategory !== undefined) changes.subcategory = data.changes.subcategory;
+              if (changes.openingHours === undefined && data.changes.openingHours !== undefined) changes.openingHours = data.changes.openingHours;
+              if (changes.photoUrls === undefined && data.changes.photoUrls !== undefined) changes.photoUrls = data.changes.photoUrls;
+            }
+
+            // Also check direct root-level fields (fallback)
             if (changes.name === undefined && data.name !== undefined) changes.name = data.name;
             if (changes.description === undefined && data.description !== undefined) changes.description = data.description;
             if (changes.category === undefined && data.category !== undefined) changes.category = data.category;
             if (changes.subcategory === undefined && data.subcategory !== undefined) changes.subcategory = data.subcategory;
             if (changes.openingHours === undefined && data.openingHours !== undefined) changes.openingHours = data.openingHours;
-            if (changes.latitude === undefined && data.latitude !== undefined) changes.latitude = data.latitude;
-            if (changes.longitude === undefined && data.longitude !== undefined) changes.longitude = data.longitude;
             if (changes.photoUrls === undefined && data.photoUrls !== undefined) changes.photoUrls = data.photoUrls;
+
+            // Use iOS original fields if available, otherwise use fetched original
+            const originalFromDoc = {
+              name: data.originalName,
+              description: data.originalDescription,
+              category: data.originalCategory,
+              subcategory: data.originalSubcategory,
+              openingHours: data.originalOpeningHours,
+              photoUrls: data.originalPhotoUrls || (data.originalPhotoUrl ? [data.originalPhotoUrl] : undefined),
+            };
+
+            // Merge: prefer document's original fields, fallback to fetched POI data
+            const mergedOriginal = {
+              name: originalFromDoc.name ?? original?.name ?? '',
+              description: originalFromDoc.description ?? original?.description ?? '',
+              category: originalFromDoc.category ?? original?.category ?? '',
+              subcategory: originalFromDoc.subcategory ?? original?.subcategory ?? '',
+              openingHours: originalFromDoc.openingHours ?? original?.openingHours ?? '',
+              latitude: original?.latitude,
+              longitude: original?.longitude,
+              photoUrls: originalFromDoc.photoUrls ?? original?.photoUrls ?? [],
+            };
 
             return {
               id: doc.id,
               type: 'edit',
               poiId: data.poiId,
               poiCollection: poiCollection,
-              poiName: data.poiName || original?.name || 'POI inconnu',
+              poiName: data.poiName || data.originalName || original?.name || 'POI inconnu',
               changes: changes,
-              original: original,
+              original: mergedOriginal,
               userId: data.userId || data.createdBy,
               status: data.status,
               createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
