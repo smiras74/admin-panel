@@ -320,7 +320,7 @@ function POIsContent() {
   // Save POI changes
   const handleSave = async () => {
     if (!editingPoi) return;
-    
+
     setSaving(true);
     try {
       const response = await fetch('/api/pois/update', {
@@ -341,6 +341,26 @@ function POIsContent() {
       });
 
       if (response.ok) {
+        // If this was from a pending edit, mark it as approved
+        const pendingEditId = (editingPoi as any).pendingEditId;
+        if (pendingEditId) {
+          try {
+            await fetch('/api/moderation', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: pendingEditId,
+                type: 'edit',
+                action: 'approve',
+              }),
+            });
+            // Refresh notification counts
+            window.dispatchEvent(new Event('refresh-pending-counts'));
+          } catch (e) {
+            console.error('Error approving pending edit:', e);
+          }
+        }
+
         handleCloseEdit();
         fetchPOIs();
       } else {
