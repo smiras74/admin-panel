@@ -45,11 +45,21 @@ interface PendingEdit {
   changes: {
     name?: string;
     description?: string;
+    category?: string;
+    subcategory?: string;
+    openingHours?: string;
+    latitude?: number;
+    longitude?: number;
     photoUrls?: string[];
   };
   original?: {
     name?: string;
     description?: string;
+    category?: string;
+    subcategory?: string;
+    openingHours?: string;
+    latitude?: number;
+    longitude?: number;
     photoUrls?: string[];
   };
   userId?: string;
@@ -493,7 +503,102 @@ function ModerationContent() {
                               </div>
                             )}
 
-                            {!edit.changes.name && !edit.changes.description && (
+                            {edit.changes.category !== undefined && (
+                              <div className="mb-4">
+                                <span className="text-gray-500 text-sm font-medium">Catégorie:</span>
+                                <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  <div className="p-2 bg-red-900/30 border border-red-800 rounded-lg">
+                                    <span className="text-xs text-red-400 block mb-1">Avant</span>
+                                    <span className="text-gray-300">{edit.original?.category || '—'}</span>
+                                  </div>
+                                  <div className="p-2 bg-green-900/30 border border-green-800 rounded-lg">
+                                    <span className="text-xs text-green-400 block mb-1">Après</span>
+                                    <span className="text-gray-300">{edit.changes.category || '—'}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {edit.changes.subcategory !== undefined && (
+                              <div className="mb-4">
+                                <span className="text-gray-500 text-sm font-medium">Sous-catégorie:</span>
+                                <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  <div className="p-2 bg-red-900/30 border border-red-800 rounded-lg">
+                                    <span className="text-xs text-red-400 block mb-1">Avant</span>
+                                    <span className="text-gray-300">{edit.original?.subcategory || '—'}</span>
+                                  </div>
+                                  <div className="p-2 bg-green-900/30 border border-green-800 rounded-lg">
+                                    <span className="text-xs text-green-400 block mb-1">Après</span>
+                                    <span className="text-gray-300">{edit.changes.subcategory || '—'}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {edit.changes.openingHours !== undefined && (
+                              <div className="mb-4">
+                                <span className="text-gray-500 text-sm font-medium">Horaires:</span>
+                                <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  <div className="p-2 bg-red-900/30 border border-red-800 rounded-lg">
+                                    <span className="text-xs text-red-400 block mb-1">Avant</span>
+                                    <span className="text-gray-300">{edit.original?.openingHours || '—'}</span>
+                                  </div>
+                                  <div className="p-2 bg-green-900/30 border border-green-800 rounded-lg">
+                                    <span className="text-xs text-green-400 block mb-1">Après</span>
+                                    <span className="text-gray-300">{edit.changes.openingHours || '—'}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {edit.changes.photoUrls !== undefined && (
+                              <div className="mb-4">
+                                <span className="text-gray-500 text-sm font-medium">Photos:</span>
+                                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                  <div className="p-3 bg-red-900/30 border border-red-800 rounded-lg">
+                                    <span className="text-xs text-red-400 block mb-2">Avant</span>
+                                    <div className="flex gap-2 flex-wrap">
+                                      {(edit.original?.photoUrls || []).length > 0 ? (
+                                        edit.original?.photoUrls?.map((url, i) => (
+                                          <img
+                                            key={i}
+                                            src={url}
+                                            alt={`Photo ${i + 1}`}
+                                            className="w-16 h-16 object-cover rounded border border-red-800"
+                                          />
+                                        ))
+                                      ) : (
+                                        <span className="text-gray-500 text-sm">Aucune photo</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="p-3 bg-green-900/30 border border-green-800 rounded-lg">
+                                    <span className="text-xs text-green-400 block mb-2">Après</span>
+                                    <div className="flex gap-2 flex-wrap">
+                                      {(edit.changes.photoUrls || []).length > 0 ? (
+                                        edit.changes.photoUrls?.map((url, i) => (
+                                          <img
+                                            key={i}
+                                            src={url}
+                                            alt={`Photo ${i + 1}`}
+                                            className="w-16 h-16 object-cover rounded border border-green-800"
+                                          />
+                                        ))
+                                      ) : (
+                                        <span className="text-gray-500 text-sm">Aucune photo</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {!edit.changes.name &&
+                             !edit.changes.description &&
+                             edit.changes.category === undefined &&
+                             edit.changes.subcategory === undefined &&
+                             edit.changes.openingHours === undefined &&
+                             edit.changes.photoUrls === undefined && (
                               <div className="flex items-center gap-2 text-gray-500 mb-4">
                                 <AlertCircle className="w-4 h-4" />
                                 <span>Aucun changement détecté</span>

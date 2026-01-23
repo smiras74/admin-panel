@@ -110,6 +110,11 @@ export async function GET(request: NextRequest) {
                   original = {
                     name: origData?.name || '',
                     description: origData?.description || origData?.shortDescription || '',
+                    category: origData?.category || '',
+                    subcategory: origData?.subcategory || '',
+                    openingHours: origData?.openingHours || '',
+                    latitude: origData?.latitude || origData?.coordinate?._latitude,
+                    longitude: origData?.longitude || origData?.coordinate?._longitude,
                     photoUrls: origData?.photoUrls || (origData?.photoUrl ? [origData.photoUrl] : []),
                   };
                 }
@@ -284,6 +289,11 @@ export async function POST(request: NextRequest) {
               updateData.shortDescription = changes.description;
             }
           }
+          if (changes.category !== undefined) updateData.category = changes.category;
+          if (changes.subcategory !== undefined) updateData.subcategory = changes.subcategory;
+          if (changes.openingHours !== undefined) updateData.openingHours = changes.openingHours;
+          if (changes.latitude !== undefined) updateData.latitude = changes.latitude;
+          if (changes.longitude !== undefined) updateData.longitude = changes.longitude;
           if (changes.photoUrls !== undefined) {
             updateData.photoUrls = changes.photoUrls;
             updateData.photoUrl = changes.photoUrls[0] || '';
