@@ -332,16 +332,19 @@ export async function POST(request: NextRequest) {
         }
       } else if (type === 'edit') {
         // Approve edit - apply changes to original POI
-        if (poiId && poiCollection && changes) {
+        // Use provided poiCollection or default to 'pois'
+        const targetCollection = poiCollection || 'pois';
+
+        if (poiId && changes && Object.keys(changes).length > 0) {
           const updateData: any = {
             updatedAt: new Date(),
             updatedFromEdit: id,
           };
-          
+
           if (changes.name !== undefined) updateData.name = changes.name;
           if (changes.description !== undefined) {
             updateData.description = changes.description;
-            if (poiCollection === 'cached_pois') {
+            if (targetCollection === 'cached_pois') {
               updateData.shortDescription = changes.description;
             }
           }
@@ -355,9 +358,10 @@ export async function POST(request: NextRequest) {
             updateData.photoUrl = changes.photoUrls[0] || '';
           }
 
-          await db.collection(poiCollection).doc(poiId).update(updateData);
+          console.log(`Updating POI ${poiId} in ${targetCollection} with:`, updateData);
+          await db.collection(targetCollection).doc(poiId).update(updateData);
         }
-        
+
         // Mark edit as approved
         await db.collection('poi_edits').doc(id).update({
           status: 'approved',
