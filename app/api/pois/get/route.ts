@@ -65,8 +65,49 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // If still not found, try querying by osmId or id field
+    if (!doc) {
+      console.log('Trying to find by osmId/id field query...');
+      for (const col of validCollections) {
+        // Try osmId field (number or string)
+        let querySnapshot = await db.collection(col)
+          .where('osmId', '==', parseInt(id))
+          .limit(1)
+          .get();
+
+        if (querySnapshot.empty) {
+          querySnapshot = await db.collection(col)
+            .where('osmId', '==', id)
+            .limit(1)
+            .get();
+        }
+
+        // Try id field
+        if (querySnapshot.empty) {
+          querySnapshot = await db.collection(col)
+            .where('id', '==', parseInt(id))
+            .limit(1)
+            .get();
+        }
+
+        if (querySnapshot.empty) {
+          querySnapshot = await db.collection(col)
+            .where('id', '==', id)
+            .limit(1)
+            .get();
+        }
+
+        if (!querySnapshot.empty) {
+          doc = querySnapshot.docs[0];
+          foundInCollection = col;
+          console.log(`Found POI by field query in ${col}, doc ID: ${doc.id}`);
+          break;
+        }
+      }
+    }
+
     if (!doc || !doc.exists) {
-      console.log(`POI not found. Tried IDs: ${idVariants.join(', ')} in collections: ${validCollections.join(', ')}`);
+      console.log(`POI not found. Tried IDs: ${idVariants.join(', ')} and field queries in collections: ${validCollections.join(', ')}`);
       return NextResponse.json(
         { error: 'POI not found' },
         { status: 404 }
