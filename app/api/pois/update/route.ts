@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     
     // Support both formats: direct fields or nested in "updates"
-    const { id, source, updates } = body;
+    const { id, source, updates, collection: specifiedCollection } = body;
     const name = updates?.name ?? body.name;
     const description = updates?.description ?? body.description;
     const category = updates?.category ?? body.category;
@@ -27,27 +27,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // First try the unified 'pois' collection
-    let docRef = db.collection('pois').doc(id);
-    let docSnap = await docRef.get();
-    let collectionName = 'pois';
-    
-    // Fallback to old collections if not found in 'pois'
-    if (!docSnap.exists) {
-      const oldCollections = ['verified_pois', 'cached_pois', 'custom_pois'];
-      
-      for (const col of oldCollections) {
-        const oldDoc = await db.collection(col).doc(id).get();
-        if (oldDoc.exists) {
+    // If collection is specified, try that first
+    let docRef: any;
+    let docSnap: any;
+    let collectionName = specifiedCollection || 'pois';
+
+    if (specifiedCollection) {
+      docRef = db.collection(specifiedCollection).doc(id);
+      docSnap = await docRef.get();
+      console.log(`Checking specified collection ${specifiedCollection}: exists=${docSnap.exists}`);
+    }
+
+    // If not found in specified collection or no collection specified, search all
+    if (!docSnap?.exists) {
+      const collectionsToSearch = ['pois', 'verified_pois', 'cached_pois', 'custom_pois'];
+
+      for (const col of collectionsToSearch) {
+        const tryDoc = await db.collection(col).doc(id).get();
+        if (tryDoc.exists) {
           collectionName = col;
           docRef = db.collection(col).doc(id);
-          docSnap = oldDoc;
-          console.log(`Found POI in legacy collection: ${col}`);
+          docSnap = tryDoc;
+          console.log(`Found POI in collection: ${col}`);
           break;
         }
       }
-      
-      if (!docSnap.exists) {
+
+      if (!docSnap?.exists) {
         return NextResponse.json(
           { error: 'POI not found in any collection' },
           { status: 404 }

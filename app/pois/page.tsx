@@ -281,6 +281,8 @@ function POIsContent() {
 
               // Store the edit ID for later approval
               (poiWithChanges as any).pendingEditId = pendingChanges.editId;
+              // Store the collection for correct update
+              (poiWithChanges as any).collection = editCollection;
 
               setEditingPoi(poiWithChanges);
 
@@ -291,6 +293,8 @@ function POIsContent() {
               setEditingPoi(data.poi);
             }
           } else {
+            // Store collection for correct update
+            (data.poi as any).collection = editCollection;
             setEditingPoi(data.poi);
           }
         } else {
@@ -329,6 +333,7 @@ function POIsContent() {
         body: JSON.stringify({
           id: editingPoi.id,
           source: editingPoi.source,
+          collection: (editingPoi as any).collection,
           updates: {
             name: editForm.name,
             description: editForm.description,
