@@ -255,7 +255,44 @@ function POIsContent() {
         console.log('API response:', response.status, data);
 
         if (response.ok && data.poi) {
-          setEditingPoi(data.poi);
+          // Check if there are pending changes from moderation page
+          const pendingChangesStr = sessionStorage.getItem(`pending_edit_${editPoiId}`);
+          if (pendingChangesStr) {
+            try {
+              const pendingChanges = JSON.parse(pendingChangesStr);
+              console.log('Found pending changes from moderation:', pendingChanges);
+
+              // Merge pending changes into the POI data for the edit form
+              const poiWithChanges = { ...data.poi };
+              if (pendingChanges.changes) {
+                // Apply pending changes to the POI for display
+                if (pendingChanges.changes.name) poiWithChanges.name = pendingChanges.changes.name;
+                if (pendingChanges.changes.description) poiWithChanges.description = pendingChanges.changes.description;
+                if (pendingChanges.changes.category) poiWithChanges.category = pendingChanges.changes.category;
+                if (pendingChanges.changes.subcategory) poiWithChanges.subcategory = pendingChanges.changes.subcategory;
+                if (pendingChanges.changes.openingHours) poiWithChanges.openingHours = pendingChanges.changes.openingHours;
+                if (pendingChanges.changes.photoUrls && pendingChanges.changes.photoUrls.length > 0) {
+                  // Merge new photos with existing ones
+                  const existingPhotos = data.poi.photoUrls || [];
+                  const newPhotos = pendingChanges.changes.photoUrls || [];
+                  poiWithChanges.photoUrls = [...new Set([...newPhotos, ...existingPhotos])];
+                }
+              }
+
+              // Store the edit ID for later approval
+              (poiWithChanges as any).pendingEditId = pendingChanges.editId;
+
+              setEditingPoi(poiWithChanges);
+
+              // Clear the sessionStorage after using
+              sessionStorage.removeItem(`pending_edit_${editPoiId}`);
+            } catch (e) {
+              console.error('Error parsing pending changes:', e);
+              setEditingPoi(data.poi);
+            }
+          } else {
+            setEditingPoi(data.poi);
+          }
         } else {
           console.error('POI not found:', data.error);
           alert(`POI non trouvé: ${data.error || 'Erreur inconnue'}`);

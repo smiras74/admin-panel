@@ -114,6 +114,14 @@ function ModerationContent() {
 
   // Handler to approve edit and redirect to POI page for full editing
   const handleApproveAndRedirect = (edit: PendingEdit) => {
+    // Store pending changes in sessionStorage so POI edit page can use them
+    const pendingChanges = {
+      editId: edit.id,
+      changes: edit.changes,
+      original: edit.original,
+    };
+    sessionStorage.setItem(`pending_edit_${edit.poiId}`, JSON.stringify(pendingChanges));
+
     // Navigate to POIs page with edit mode for this POI
     router.push(`/pois?edit=${edit.poiId}&collection=${edit.poiCollection || 'pois'}`);
   };
