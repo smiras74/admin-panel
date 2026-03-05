@@ -186,10 +186,10 @@ export default function DashboardPage() {
                 />
                 <StatCard
                   title="Distance totale"
-                  value={stats.totalKm ? `${Math.round(stats.totalKm / 1000)}k` : '0'}
+                  value={stats.totalKm ? `${Math.round(stats.totalKm).toLocaleString('fr-FR')}` : '0'}
                   icon={Navigation}
                   color="green"
-                  subtitle={`${(stats.totalKm || 0).toLocaleString()} km`}
+                  subtitle="km"
                 />
                 <StatCard
                   title="Avec photo"
