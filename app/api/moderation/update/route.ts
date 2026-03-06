@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate collection
-    const allowedCollections = ['custom_pois', 'pois'];
+    const allowedCollections = ['custom_pois', 'pois', 'cached_pois', 'verified_pois'];
     if (!allowedCollections.includes(collection)) {
       return NextResponse.json(
         { error: 'Invalid collection' },
