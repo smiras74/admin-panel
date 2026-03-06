@@ -333,13 +333,30 @@ export default function ReportsPage() {
                           </div>
                         )}
 
-                        {report.status !== 'pending' && (
-                          <span className={`px-3 py-1 rounded-full text-xs ${
-                            report.status === 'resolved' 
-                              ? 'bg-green-900 text-green-300'
-                              : 'bg-gray-700 text-gray-300'
-                          }`}>
-                            {report.status === 'resolved' ? 'Résolu' : 'Traité'}
+                        {report.status === 'reviewed' && (
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                            <button
+                              onClick={() => handleAction(report.id, 'resolve')}
+                              disabled={processing === report.id}
+                              className="flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm"
+                              title="Marquer comme résolu"
+                            >
+                              {processing === report.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Check className="w-4 h-4" />
+                              )}
+                              <span className="sm:hidden">Résolu</span>
+                            </button>
+                            <span className="px-3 py-1 rounded-full text-xs bg-gray-700 text-gray-300 self-center">
+                              Traité
+                            </span>
+                          </div>
+                        )}
+
+                        {report.status === 'resolved' && (
+                          <span className="px-3 py-1 rounded-full text-xs bg-green-900 text-green-300">
+                            Résolu
                           </span>
                         )}
                       </div>

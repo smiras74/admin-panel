@@ -58,13 +58,12 @@ export async function GET(request: NextRequest) {
     }
     
     try {
-      // Total reviews (all comments for statistics)
-      const reviewsSnapshot = await db.collection('reviews').limit(500).get();
-      totalReviews = reviewsSnapshot.size;
-      // Pending reviews (for moderation alert)
-      pendingReviews = reviewsSnapshot.docs.filter((doc: any) => {
-        return doc.data().status === 'pending';
-      }).length;
+      const [totalReviewsCount, pendingReviewsCount] = await Promise.all([
+        db.collection('reviews').count().get(),
+        db.collection('reviews').where('status', '==', 'pending').count().get(),
+      ]);
+      totalReviews = totalReviewsCount.data().count;
+      pendingReviews = pendingReviewsCount.data().count;
     } catch (e) {
       // Collection might not exist
     }

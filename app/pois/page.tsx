@@ -34,6 +34,7 @@ import { Navigation } from '@/components/Navigation';
 
 interface POI {
   id: string;
+  collection?: string;
   name: string;
   description?: string;
   category?: string;
@@ -333,7 +334,7 @@ function POIsContent() {
         body: JSON.stringify({
           id: editingPoi.id,
           source: editingPoi.source,
-          collection: (editingPoi as any).collection,
+          collection: editingPoi.collection,
           updates: {
             name: editForm.name,
             description: editForm.description,
