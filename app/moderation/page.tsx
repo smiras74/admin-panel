@@ -630,6 +630,22 @@ function ModerationContent() {
                                 Modifier le POI
                               </button>
                               <button
+                                onClick={() => handleAction(edit.id, 'edit', 'approve', {
+                                  poiId: edit.poiId,
+                                  poiCollection: edit.poiCollection,
+                                  changes: edit.changes,
+                                })}
+                                disabled={processing === edit.id}
+                                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                              >
+                                {processing === edit.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Check className="w-4 h-4" />
+                                )}
+                                Approuver
+                              </button>
+                              <button
                                 onClick={() => handleAction(edit.id, 'edit', 'reject')}
                                 disabled={processing === edit.id}
                                 className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"

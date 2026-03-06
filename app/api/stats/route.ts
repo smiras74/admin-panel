@@ -39,8 +39,11 @@ export async function GET(request: NextRequest) {
     usersSnapshot.docs.forEach(doc => {
       const data = doc.data();
       totalCheckIns += data.totalCheckIns || 0;
-      totalKm += data.totalKm || data.totalKmTraveled || 0;
+      const km = data.totalKmTraveled || data.totalKm || 0;
+      totalKm += km;
     });
+
+    console.log(`Stats: ${usersSnapshot.size} users, totalCheckIns=${totalCheckIns}, totalKm=${totalKm}`);
     
     // Count pending edits and reviews
     let pendingEdits = 0;
