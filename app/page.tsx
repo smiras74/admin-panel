@@ -171,6 +171,7 @@ export default function DashboardPage() {
                   value={stats.totalCheckIns || 0}
                   icon={CheckCircle}
                   color="green"
+                  onClick={() => router.push('/users?sortBy=totalCheckIns')}
                 />
                 <StatCard
                   title="Modifications"
@@ -178,12 +179,14 @@ export default function DashboardPage() {
                   icon={Edit3}
                   color="purple"
                   subtitle="en attente"
+                  onClick={() => router.push('/moderation?tab=edits')}
                 />
                 <StatCard
                   title="Commentaires"
                   value={stats.totalReviews || 0}
                   icon={MessageSquare}
                   color="blue"
+                  onClick={() => router.push('/moderation?tab=reviews')}
                 />
                 <StatCard
                   title="Distance totale"
@@ -191,6 +194,7 @@ export default function DashboardPage() {
                   icon={Navigation}
                   color="green"
                   subtitle="km"
+                  onClick={() => router.push('/users?sortBy=totalKmTraveled')}
                 />
                 <StatCard
                   title="Avec photo"
@@ -226,7 +230,7 @@ export default function DashboardPage() {
                   </button>
 
                   <button
-                    onClick={() => router.push('/pois?content=empty')}
+                    onClick={() => router.push('/pois?content=without-description')}
                     className="flex items-center gap-3 p-4 bg-gray-800 rounded-xl border border-gray-700 hover:border-orange-500 hover:bg-gray-750 transition-all text-left"
                   >
                     <div className="bg-orange-900 p-2 rounded-lg">

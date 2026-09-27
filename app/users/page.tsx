@@ -29,6 +29,12 @@ export default function UsersPage() {
   const [totalCount, setTotalCount] = useState(0);
   const [sortBy, setSortBy] = useState<'createdAt' | 'totalCheckIns' | 'totalKmTraveled'>('createdAt');
 
+  // Deep links from the dashboard: /users?sortBy=totalCheckIns | totalKmTraveled
+  useEffect(() => {
+    const s = new URLSearchParams(window.location.search).get('sortBy');
+    if (s === 'totalCheckIns' || s === 'totalKmTraveled' || s === 'createdAt') setSortBy(s);
+  }, []);
+
   useEffect(() => {
     if (!authLoading && !currentUser) {
       router.push('/login');

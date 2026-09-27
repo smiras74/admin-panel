@@ -19,6 +19,7 @@ function contentWhere(q: Query, content: string): Query {
     case 'with-photo': return q.where('hasPhoto', '==', true);
     case 'with-description': return q.where('hasDescription', '==', true);
     case 'with-hours': return q.where('hasHours', '==', true);
+    case 'without-description': return q.where('hasDescription', '==', false);
     case 'complete': return q.where('hasPhoto', '==', true).where('hasDescription', '==', true);
     case 'empty': return q.where('hasPhoto', '==', false).where('hasDescription', '==', false);
     default: return q;
@@ -157,6 +158,7 @@ async function handleGET(request: NextRequest) {
         if (content === 'with-photo' && !p.hasPhoto) return false;
         if (content === 'with-description' && !p.hasDescription) return false;
         if (content === 'with-hours' && !p.hasOpeningHours) return false;
+        if (content === 'without-description' && p.hasDescription) return false;
         if (content === 'complete' && !(p.hasPhoto && p.hasDescription)) return false;
         if (content === 'empty' && (p.hasPhoto || p.hasDescription)) return false;
         return true;

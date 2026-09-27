@@ -81,6 +81,15 @@ const SOURCE_LABELS: Record<string, { label: string; color: string; icon: any }>
   user: { label: 'Utilisateur', color: 'bg-purple-900 text-purple-300', icon: Users },
 };
 
+const CONTENT_LABELS: Record<string, string> = {
+  'with-photo': 'avec photo',
+  'with-description': 'avec description',
+  'without-description': 'sans description',
+  'with-hours': 'avec horaires',
+  'complete': 'complet',
+  'empty': 'vide (ni photo ni description)',
+};
+
 const SORT_OPTIONS = [
   { value: 'name', label: 'Nom A-Z' },
   { value: 'name-desc', label: 'Nom Z-A' },
@@ -107,11 +116,11 @@ function POIsContent() {
   const editCollection = searchParams.get('collection') || 'pois';
 
   // Filters
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
   const [sourceFilter, setSourceFilter] = useState('all');
-  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState(searchParams.get('category') || 'all');
   const [subcategoryFilter, setSubcategoryFilter] = useState('all');
-  const [contentFilter, setContentFilter] = useState('all');
+  const [contentFilter, setContentFilter] = useState(searchParams.get('content') || 'all');
   const [sortOption, setSortOption] = useState('name');
   const [page, setPage] = useState(1);
   const [sortApplied, setSortApplied] = useState(true);
@@ -837,7 +846,7 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
               )}
               {contentFilter !== 'all' && (
                 <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded-lg text-xs text-gray-300">
-                  Contenu: {contentFilter}
+                  Contenu: {CONTENT_LABELS[contentFilter] || contentFilter}
                   <button onClick={() => setContentFilter('all')} className="text-gray-500 hover:text-gray-300">×</button>
                 </span>
               )}
