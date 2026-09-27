@@ -38,6 +38,8 @@ console.log('reports', s, { listed: d.reports?.length });
 console.log('wiki Fontainebleau', s, { found: d.found, title: d.title, hasPhoto: !!d.photoUrl });
 [s, d] = await post('/api/pois/enrich', { name: 'La Brocante de Serris', latitude: 48.8537, longitude: 2.7856 });
 console.log('wiki Brocante Serris', s, { found: d.found, title: d.title });
+[s, d] = await post('/api/pois/enrich-ai', { name: 'Château de Fontainebleau', category: 'histoire', latitude: 48.4021, longitude: 2.6997 });
+console.log('AI Fontainebleau', s, d.error || d.description);
 [s, d] = await post('/api/pois/enrich-ai', { name: 'Lavoir du Ru de Zzqx', category: 'histoire', latitude: 48.9, longitude: 2.9 });
 console.log('AI unknown place', s, d.error || d.description?.slice(0, 80));
 process.exit(0);
