@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { withAdmin } from '@/lib/admin-auth';
 import { readPhotos, photoWriteFields } from '@/lib/poi-photos';
+import { refreshDerived } from '@/lib/poi-derived';
 
 export const dynamic = 'force-dynamic';
 
@@ -320,6 +321,7 @@ async function handlePOST(request: NextRequest) {
             approvedByAdmin: true,
             publishedAt: new Date(),
           });
+          await refreshDerived(db.collection('pois').doc(id));
         } else {
           // POI is in custom_pois, copy to main 'pois' collection
           const pendingDoc = await db.collection(sourceCollection).doc(id).get();
@@ -343,6 +345,7 @@ async function handlePOST(request: NextRequest) {
             
             // Copy to main pois collection
             await db.collection('pois').doc(id).set(publishedData);
+            await refreshDerived(db.collection('pois').doc(id));
             
             // Update status in source collection
             await db.collection(sourceCollection).doc(id).update({
@@ -384,6 +387,7 @@ async function handlePOST(request: NextRequest) {
 
           console.log(`Updating POI ${poiId} in ${targetCollection} with:`, updateData);
           await db.collection(targetCollection).doc(poiId).update(updateData);
+          await refreshDerived(db.collection(targetCollection).doc(poiId));
         }
 
         // Mark edit as approved

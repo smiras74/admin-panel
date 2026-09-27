@@ -114,6 +114,7 @@ function POIsContent() {
   const [contentFilter, setContentFilter] = useState('all');
   const [sortOption, setSortOption] = useState('name');
   const [page, setPage] = useState(1);
+  const [sortApplied, setSortApplied] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
 
   // Edit modal
@@ -197,6 +198,7 @@ function POIsContent() {
         setContentStats(data.contentStats || { withPhoto: 0, withDescription: 0, complete: 0, empty: 0 });
         setSubcategories(data.subcategories || []);
         setPagination(data.pagination || null);
+        setSortApplied(data.sortApplied !== false);
       }
     } catch (error) {
       console.error('Error fetching POIs:', error);
@@ -807,6 +809,11 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
+                  {!sortApplied && (
+                    <p className="text-xs text-amber-400 mt-1">
+                      Tri indisponible avec filtres — utilisez la recherche pour trier.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

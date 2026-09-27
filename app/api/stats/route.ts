@@ -23,12 +23,16 @@ async function handleGET(request: NextRequest) {
     ] = await Promise.all([
       db.collection('users').count().get(),
       poisCollection.count().get(),
-      poisCollection.where('status', '==', 'pending').count().get().catch(() => ({ data: () => ({ count: 0 }) })),
+      Promise.all([
+        poisCollection.where('status', '==', 'pending').count().get(),
+        db.collection('custom_pois').where('status', '==', 'pending').count().get(),
+      ]).then(([a, b]) => ({ data: () => ({ count: a.data().count + b.data().count }) }))
+        .catch(() => ({ data: () => ({ count: 0 }) })),
       db.collection('waitlist').count().get().catch(() => ({ data: () => ({ count: 0 }) })),
       // POI с фото (photoUrls существует и не пустой)
-      poisCollection.where('photoUrls', '!=', []).count().get().catch(() => ({ data: () => ({ count: 0 }) })),
+      poisCollection.where('hasPhoto', '==', true).count().get().catch(() => ({ data: () => ({ count: 0 }) })),
       // POI с описанием
-      poisCollection.where('description', '!=', '').count().get().catch(() => ({ data: () => ({ count: 0 }) })),
+      poisCollection.where('hasDescription', '==', true).count().get().catch(() => ({ data: () => ({ count: 0 }) })),
     ]);
     
     // Get aggregated stats from users

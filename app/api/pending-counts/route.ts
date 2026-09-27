@@ -47,11 +47,8 @@ async function handleGET(request: NextRequest) {
 
     // Pending reviews - fetch all and filter locally
     try {
-      const reviewsSnapshot = await db.collection('reviews').limit(200).get();
-      counts.reviews = reviewsSnapshot.docs.filter((doc: any) => {
-        const status = doc.data().status;
-        return status === 'pending';
-      }).length;
+      // Same query as the moderation list
+      counts.reviews = (await db.collection('reviews').where('status', '==', 'pending').count().get()).data().count;
     } catch (e: any) {
       console.log('Error counting pending reviews:', e.message);
     }
@@ -59,7 +56,7 @@ async function handleGET(request: NextRequest) {
     // Pending reports - need to count both status=pending AND missing status
     try {
       // Get all reports and filter (because old reports might not have status field)
-      const reportsSnapshot = await db.collection('reports').limit(200).get();
+      const reportsSnapshot = await db.collection('reports').limit(2000).get();
       counts.reports = reportsSnapshot.docs.filter((doc: any) => {
         const status = doc.data().status;
         return !status || status === 'pending';

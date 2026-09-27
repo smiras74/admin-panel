@@ -8,10 +8,8 @@ async function handleGET(request: NextRequest) {
   try {
     const { db } = getFirebaseAdmin();
     
-    const snapshot = await db.collection('waitlist')
-      .orderBy('date', 'desc')
-      .limit(500)
-      .get();
+    // No orderBy: it silently drops docs without `date` (older entries use createdAt)
+    const snapshot = await db.collection('waitlist').limit(2000).get();
     
     const waitlist = snapshot.docs.map((doc: any) => {
       const data = doc.data();
@@ -26,6 +24,8 @@ async function handleGET(request: NextRequest) {
         createdAt: data.date?.toDate?.()?.toISOString() || data.createdAt?.toDate?.()?.toISOString() || null,
       };
     });
+
+    waitlist.sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 
     return NextResponse.json({
       waitlist,

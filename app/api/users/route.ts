@@ -12,19 +12,9 @@ async function handleGET(request: NextRequest) {
     const search = searchParams.get('search')?.toLowerCase() || '';
     const sortBy = searchParams.get('sortBy') || 'createdAt';
 
-    // Fetch users
-    let query: any = db.collection('users');
-    
-    // Sort
-    if (sortBy === 'createdAt') {
-      query = query.orderBy('createdAt', 'desc');
-    } else if (sortBy === 'totalCheckIns') {
-      query = query.orderBy('totalCheckIns', 'desc');
-    } else if (sortBy === 'totalKmTraveled') {
-      query = query.orderBy('totalKmTraveled', 'desc');
-    }
-    
-    const snapshot = await query.limit(200).get();
+    // No orderBy: Firestore drops documents missing the ordered field.
+    // Sort in memory on the normalized values instead.
+    const snapshot = await db.collection('users').limit(2000).get();
     
     let users = snapshot.docs.map((doc: any) => {
       const data = doc.data();
@@ -45,6 +35,11 @@ async function handleGET(request: NextRequest) {
         createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
       };
     });
+
+    const key = sortBy === 'totalCheckIns' ? 'totalCheckIns' : sortBy === 'totalKmTraveled' ? 'totalKmTraveled' : 'createdAt';
+    users.sort((a: any, b: any) => key === 'createdAt'
+      ? (b.createdAt || '').localeCompare(a.createdAt || '')
+      : (b[key] || 0) - (a[key] || 0));
 
     // Filter by search (client-side for simplicity)
     if (search) {

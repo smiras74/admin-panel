@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { withAdmin } from '@/lib/admin-auth';
 import { photoWriteFields } from '@/lib/poi-photos';
+import { refreshDerived } from '@/lib/poi-derived';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,6 +105,7 @@ async function handlePOST(request: NextRequest) {
 
     // Update the document
     await docRef.update(updateData);
+    await refreshDerived(docRef);
 
     console.log(`POI updated: ${collectionName}/${id}`);
 

@@ -119,9 +119,13 @@ export default function ReportsPage() {
         setReports(prev => prev.filter(r => r.id !== reportId));
         // Refresh notification counts
         window.dispatchEvent(new Event('refresh-pending-counts'));
+      } else {
+        const err = await response.json().catch(() => ({}));
+        alert(`Erreur: ${err.error || response.status}`);
       }
     } catch (error) {
       console.error('Error processing action:', error);
+      alert('Erreur réseau — action non effectuée');
     } finally {
       setProcessing(null);
     }

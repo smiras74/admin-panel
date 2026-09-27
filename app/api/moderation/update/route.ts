@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { withAdmin } from '@/lib/admin-auth';
+import { refreshDerived } from '@/lib/poi-derived';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,16 +56,16 @@ async function handlePOST(request: NextRequest) {
       cleanUpdates.name = updates.name.trim();
     }
     if (updates.description !== undefined) {
-      cleanUpdates.description = updates.description.trim();
+      cleanUpdates.description = typeof updates.description === 'string' ? updates.description.trim() : '';
     }
     if (updates.category?.trim()) {
       cleanUpdates.category = updates.category.trim();
     }
     if (updates.subcategory !== undefined) {
-      cleanUpdates.subcategory = updates.subcategory.trim();
+      cleanUpdates.subcategory = typeof updates.subcategory === 'string' ? updates.subcategory.trim() : '';
     }
     if (updates.openingHours !== undefined) {
-      cleanUpdates.openingHours = updates.openingHours.trim();
+      cleanUpdates.openingHours = typeof updates.openingHours === 'string' ? updates.openingHours.trim() : '';
     }
 
     // Add modification timestamp
@@ -73,6 +74,7 @@ async function handlePOST(request: NextRequest) {
 
     // Update the document
     await docRef.update(cleanUpdates);
+    await refreshDerived(docRef);
 
     console.log(`Updated POI ${id} in ${collection}:`, cleanUpdates);
 

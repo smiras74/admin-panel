@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { withAdmin } from '@/lib/admin-auth';
+import { softDeletePOI } from '@/lib/poi-delete';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,10 +13,8 @@ async function handleGET(request: NextRequest) {
     const status = searchParams.get('status') || 'pending';
 
     // Always fetch all reports then filter (because old reports might not have status field)
-    const snapshot = await db.collection('reports')
-      .orderBy('createdAt', 'desc')
-      .limit(200)
-      .get();
+    // No orderBy/limit before filtering: old reports may lack createdAt/status
+    const snapshot = await db.collection('reports').limit(2000).get();
     
     let reports = snapshot.docs.map((doc: any) => {
       const data = doc.data();
@@ -41,6 +40,7 @@ async function handleGET(request: NextRequest) {
     if (status !== 'all') {
       reports = reports.filter(r => r.status === status);
     }
+    reports.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 
     return NextResponse.json({ reports });
 
@@ -99,75 +99,18 @@ async function handlePOST(request: NextRequest) {
         });
         break;
 
-      case 'delete_poi':
-        // Delete the POI and mark report as resolved
+      case 'delete_poi': {
+        // Same deletion path as the POIs page (see lib/poi-delete.ts)
         const targetPoiId = poiId || reportData?.poiId;
-        const poiName = reportData?.poiName || 'Unknown';
-        const poiLocation = reportData?.poiLocation;
-        
         if (targetPoiId) {
-          // Try to delete from multiple collections and get OSM ID
-          const collections = ['pois', 'cached_pois', 'custom_pois', 'verified_pois'];
-          let osmId: string | null = null;
-          let foundPoiData: any = null;
-          
-          for (const collection of collections) {
-            try {
-              const poiDoc = await db.collection(collection).doc(targetPoiId).get();
-              if (poiDoc.exists) {
-                foundPoiData = poiDoc.data();
-                
-                // Extract OSM ID if exists
-                if (foundPoiData?.osmId) {
-                  osmId = foundPoiData.osmId;
-                } else if (targetPoiId.startsWith('node/') || targetPoiId.startsWith('way/') || targetPoiId.startsWith('relation/')) {
-                  osmId = targetPoiId;
-                }
-                
-                // Soft delete
-                await db.collection(collection).doc(targetPoiId).update({
-                  status: 'deleted',
-                  deletedAt: new Date(),
-                  deletedByAdmin: true,
-                  deletedReason: `Report: ${reportData?.type || 'closed'}`,
-                });
-                
-                console.log(`POI ${targetPoiId} marked as deleted in ${collection}`);
-              }
-            } catch (e) {
-              // Collection might not have this POI, continue
-            }
-          }
-          
-          // Add to blocked_pois to prevent OSM re-import
-          const blockData: any = {
-            poiId: targetPoiId,
-            poiName: foundPoiData?.name || poiName,
-            reason: reportData?.type || 'closed',
-            reportId: reportId,
-            blockedAt: new Date(),
-            blockedByAdmin: true,
-          };
-          
-          if (osmId) {
-            blockData.osmId = osmId;
-          }
-          
-          if (poiLocation) {
-            blockData.location = poiLocation;
-          } else if (foundPoiData?.coordinate) {
-            blockData.location = foundPoiData.coordinate;
-          } else if (foundPoiData?.latitude && foundPoiData?.longitude) {
-            blockData.location = {
-              latitude: foundPoiData.latitude,
-              longitude: foundPoiData.longitude,
-            };
-          }
-          
-          await db.collection('blocked_pois').doc(targetPoiId).set(blockData);
-          console.log(`POI ${targetPoiId} added to blocked_pois`);
+          await softDeletePOI(db, targetPoiId, {
+            reason: `report:${reportData?.type || 'closed'}`,
+            reportId,
+            fallbackName: reportData?.poiName,
+            fallbackLocation: reportData?.poiLocation,
+          });
         }
-        
+
         // Mark report as resolved
         await reportRef.update({
           status: 'resolved',
@@ -176,6 +119,7 @@ async function handlePOST(request: NextRequest) {
           poiDeleted: true,
         });
         break;
+      }
 
       default:
         return NextResponse.json(
