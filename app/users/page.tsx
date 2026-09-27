@@ -17,6 +17,7 @@ import {
 import { useAuth } from '@/lib/auth-context';
 import { Navigation } from '@/components/Navigation';
 import type { User } from '@/types';
+import { apiFetch } from '@/lib/api-client';
 
 export default function UsersPage() {
   const { user: currentUser, loading: authLoading } = useAuth();
@@ -43,7 +44,7 @@ export default function UsersPage() {
       if (searchQuery) params.set('search', searchQuery);
       params.set('sortBy', sortBy);
 
-      const response = await fetch(`/api/users?${params}`);
+      const response = await apiFetch(`/api/users?${params}`);
       if (response.ok) {
         const data = await response.json();
         setUsers(data.users);

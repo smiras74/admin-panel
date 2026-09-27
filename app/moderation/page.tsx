@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { Navigation } from '@/components/Navigation';
+import { apiFetch } from '@/lib/api-client';
 
 interface PendingPOI {
   id: string;
@@ -142,7 +143,7 @@ function ModerationContent() {
     
     setLoading(true);
     try {
-      const response = await fetch('/api/moderation?type=all');
+      const response = await apiFetch('/api/moderation?type=all');
       if (response.ok) {
         const data = await response.json();
         setPois(data.pois || []);
@@ -164,7 +165,7 @@ function ModerationContent() {
   ) => {
     setProcessing(id);
     try {
-      const response = await fetch('/api/moderation', {
+      const response = await apiFetch('/api/moderation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -223,7 +224,7 @@ function ModerationContent() {
     setSaving(true);
     try {
       // First update the POI in pending collection
-      const updateResponse = await fetch('/api/moderation/update', {
+      const updateResponse = await apiFetch('/api/moderation/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -240,7 +241,7 @@ function ModerationContent() {
       }
 
       // Then approve
-      const approveResponse = await fetch('/api/moderation', {
+      const approveResponse = await apiFetch('/api/moderation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

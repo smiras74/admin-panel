@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
+import { withAdmin } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   try {
     const { db } = getFirebaseAdmin();
     const { searchParams } = new URL(request.url);
@@ -66,3 +67,5 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export const GET = withAdmin(handleGET);

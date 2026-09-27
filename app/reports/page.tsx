@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { Navigation } from '@/components/Navigation';
+import { apiFetch } from '@/lib/api-client';
 
 interface Report {
   id: string;
@@ -85,7 +86,7 @@ export default function ReportsPage() {
   const fetchReports = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/reports?status=${filter}`);
+      const response = await apiFetch(`/api/reports?status=${filter}`);
       if (response.ok) {
         const data = await response.json();
         setReports(data.reports || []);
@@ -104,7 +105,7 @@ export default function ReportsPage() {
   ) => {
     setProcessing(reportId);
     try {
-      const response = await fetch('/api/reports', {
+      const response = await apiFetch('/api/reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

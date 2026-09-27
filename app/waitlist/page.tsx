@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { Navigation } from '@/components/Navigation';
+import { apiFetch } from '@/lib/api-client';
 
 interface WaitlistEntry {
   id: string;
@@ -42,7 +43,7 @@ export default function WaitlistPage() {
   useEffect(() => {
     async function fetchWaitlist() {
       try {
-        const response = await fetch('/api/waitlist');
+        const response = await apiFetch('/api/waitlist');
         if (response.ok) {
           const data = await response.json();
           setEntries(data.waitlist || []);

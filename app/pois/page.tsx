@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { Navigation } from '@/components/Navigation';
+import { apiFetch } from '@/lib/api-client';
 
 interface POI {
   id: string;
@@ -216,7 +217,7 @@ function POIsContent() {
       params.set('page', page.toString());
       params.set('limit', '50');
 
-      const response = await fetch(`/api/pois?${params}`);
+      const response = await apiFetch(`/api/pois?${params}`);
       if (response.ok) {
         const data = await response.json();
         setPois(data.pois || []);
@@ -250,7 +251,7 @@ function POIsContent() {
 
       try {
         // Fetch the specific POI from Firestore via API endpoint
-        const response = await fetch(`/api/pois/get?id=${editPoiId}&collection=${editCollection}`);
+        const response = await apiFetch(`/api/pois/get?id=${editPoiId}&collection=${editCollection}`);
         const data = await response.json();
 
         console.log('API response:', response.status, data);
@@ -328,7 +329,7 @@ function POIsContent() {
 
     setSaving(true);
     try {
-      const response = await fetch('/api/pois/update', {
+      const response = await apiFetch('/api/pois/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -351,7 +352,7 @@ function POIsContent() {
         const pendingEditId = (editingPoi as any).pendingEditId;
         if (pendingEditId) {
           try {
-            await fetch('/api/moderation', {
+            await apiFetch('/api/moderation', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -387,7 +388,7 @@ function POIsContent() {
     
     setEnriching(true);
     try {
-      const response = await fetch('/api/pois/enrich', {
+      const response = await apiFetch('/api/pois/enrich', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -428,7 +429,7 @@ function POIsContent() {
     
     setEnrichingAI(true);
     try {
-      const response = await fetch('/api/pois/enrich-ai', {
+      const response = await apiFetch('/api/pois/enrich-ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -588,7 +589,7 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
         formData.append('file', fileToUpload, file.name);
         formData.append('poiId', editingPoi.id);
 
-        const response = await fetch('/api/upload', {
+        const response = await apiFetch('/api/upload', {
           method: 'POST',
           body: formData,
         });
@@ -632,7 +633,7 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
     
     setDeleting(true);
     try {
-      const response = await fetch('/api/pois/delete', {
+      const response = await apiFetch('/api/pois/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -18,6 +18,7 @@ import {
   PlusCircle
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
+import { apiFetch } from '@/lib/api-client';
 
 interface NavItem {
   href: string;
@@ -57,7 +58,7 @@ export function Navigation() {
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        const response = await fetch('/api/pending-counts', { cache: 'no-store' });
+        const response = await apiFetch('/api/pending-counts', { cache: 'no-store' });
         if (response.ok) {
           const data = await response.json();
           setCounts(data);

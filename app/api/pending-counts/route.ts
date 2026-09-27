@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
+import { withAdmin } from '@/lib/admin-auth';
 
 // Force dynamic rendering to prevent caching
 export const dynamic = 'force-dynamic';
 
 // GET - Fetch all pending counts for notifications
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   try {
     const { db } = getFirebaseAdmin();
 
@@ -87,3 +88,5 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export const GET = withAdmin(handleGET);

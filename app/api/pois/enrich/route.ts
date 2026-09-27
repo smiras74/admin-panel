@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { withAdmin } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     const { name, category, subcategory, latitude, longitude, existingDescription } = await request.json();
 
@@ -113,3 +114,5 @@ HORAIRES: Mar-Sam 12h-14h et 19h-22h, fermé dimanche et lundi`;
     );
   }
 }
+
+export const POST = withAdmin(handlePOST);

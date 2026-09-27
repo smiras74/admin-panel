@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseStorage } from '@/lib/firebase-admin';
 import sharp from 'sharp';
+import { withAdmin } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -96,3 +97,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export const POST = withAdmin(handlePOST);

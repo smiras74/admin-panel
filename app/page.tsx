@@ -17,6 +17,7 @@ import {
 import { useAuth } from '@/lib/auth-context';
 import { Navigation as Nav } from '@/components/Navigation';
 import { StatCard } from '@/components/StatCard';
+import { apiFetch } from '@/lib/api-client';
 
 interface Stats {
   pendingModeration: number;
@@ -50,7 +51,7 @@ export default function DashboardPage() {
   useEffect(() => {
     async function fetchStats() {
       try {
-        const response = await fetch('/api/stats');
+        const response = await apiFetch('/api/stats');
         if (response.ok) {
           const data = await response.json();
           setStats(data);

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
+import { withAdmin } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   try {
     const { db } = getFirebaseAdmin();
     const { searchParams } = new URL(request.url);
@@ -289,7 +290,7 @@ export async function GET(request: NextRequest) {
 }
 
 // Approve or reject
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     const { db } = getFirebaseAdmin();
     const body = await request.json();
@@ -413,3 +414,6 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export const GET = withAdmin(handleGET);
+export const POST = withAdmin(handlePOST);
