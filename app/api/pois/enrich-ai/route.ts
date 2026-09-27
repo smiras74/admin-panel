@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAdmin } from '@/lib/admin-auth';
 import { fetchWikipediaSummary } from '@/lib/wikipedia';
+import { getFirebaseAdmin } from '@/lib/firebase-admin';
+import { findPoiData } from '@/lib/poi-lookup';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +10,7 @@ const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 async function handlePOST(request: NextRequest) {
   try {
-    const { name, category, subcategory, latitude, longitude, existingDescription } = await request.json();
+    const { id, collection, name, category, subcategory, latitude, longitude, existingDescription } = await request.json();
 
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
@@ -31,8 +33,10 @@ async function handlePOST(request: NextRequest) {
         : '';
 
     // Ground the model in the Wikipedia summary when an article exists
-    const wiki = await fetchWikipediaSummary(name, latitude, longitude).catch(() => null);
-    const sourceContext = wiki
+    const { db } = getFirebaseAdmin();
+    const poi = await findPoiData(db, id, collection).catch(() => null);
+    const wiki = await fetchWikipediaSummary(name, latitude, longitude, poi?.wikidataId || null).catch(() => null);
+    const sourceContext = wiki?.extract
       ? `\n\nSOURCE (Wikipédia, "${wiki.title}") — base-toi UNIQUEMENT sur ce texte:\n${wiki.extract}`
       : '';
 

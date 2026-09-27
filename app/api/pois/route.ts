@@ -38,12 +38,12 @@ function toItem(doc: FirebaseFirestore.DocumentSnapshot, colName: string) {
     lon = data.longitude;
   }
   const photoUrls = readPhotos(data);
-  const hasDescription = !!data.description && String(data.description).trim().length > 0;
+  const hasDescription = !!(data.description || data.shortDescription) && String(data.description || data.shortDescription).trim().length > 0;
   return {
     id: doc.id,
     collection: colName,
     name: data.name || 'Sans nom',
-    description: data.description,
+    description: data.description || data.shortDescription,
     category: data.category,
     subcategory: data.subcategory,
     latitude: lat,

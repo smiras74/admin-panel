@@ -11,6 +11,7 @@ export function readPhotos(data: any): string[] {
   if (Array.isArray(data?.photos)) data.photos.forEach(push);
   if (Array.isArray(data?.photoUrls)) data.photoUrls.forEach(push);
   push(data?.photoUrl);
+  push(data?.photoURL); // legacy field (read by iOS WikipediaService)
   return out;
 }
 

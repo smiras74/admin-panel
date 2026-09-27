@@ -19,7 +19,7 @@ const readPhotos = d => {
   const out = []; const push = u => { if (typeof u === 'string' && u.trim() && !out.includes(u)) out.push(u); };
   (Array.isArray(d.photos) ? d.photos : []).forEach(push);
   (Array.isArray(d.photoUrls) ? d.photoUrls : []).forEach(push);
-  push(d.photoUrl); return out;
+  push(d.photoUrl); push(d.photoURL); return out;
 };
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -39,7 +39,7 @@ for (const col of ['pois', 'verified_pois']) {
       const upd = {
         searchTokens: tokenize(d.name),
         hasPhoto: photos.length > 0,
-        hasDescription: typeof d.description === 'string' && d.description.trim().length > 0,
+        hasDescription: [d.description, d.shortDescription].some(x => typeof x === 'string' && x.trim().length > 0),
         hasHours: typeof d.openingHours === 'string' && d.openingHours.trim().length > 0,
       };
       if (photos.length && !same(d.photos, photos)) { upd.photos = photos; photoSync++; }

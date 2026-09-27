@@ -376,6 +376,7 @@ function POIsContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: editingPoi.id,
+          collection: editingPoi.collection,
           name: editForm.name,
           latitude: editingPoi.latitude,
           longitude: editingPoi.longitude,
@@ -416,6 +417,8 @@ function POIsContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: editingPoi.id,
+          collection: editingPoi.collection,
           name: editForm.name || editingPoi.name,
           category: editForm.category || editingPoi.category,
           subcategory: editForm.subcategory || editingPoi.subcategory,

@@ -24,7 +24,7 @@ export function derivedFields(data: any) {
   return {
     searchTokens: tokenize(data?.name || ''),
     hasPhoto: readPhotos(data).length > 0,
-    hasDescription: typeof data?.description === 'string' && data.description.trim().length > 0,
+    hasDescription: [data?.description, data?.shortDescription].some(d => typeof d === 'string' && d.trim().length > 0),
     hasHours: typeof data?.openingHours === 'string' && data.openingHours.trim().length > 0,
   };
 }
