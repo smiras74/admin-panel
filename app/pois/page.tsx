@@ -121,6 +121,7 @@ function POIsContent() {
   const [categoryFilter, setCategoryFilter] = useState(searchParams.get('category') || 'all');
   const [subcategoryFilter, setSubcategoryFilter] = useState('all');
   const [contentFilter, setContentFilter] = useState(searchParams.get('content') || 'all');
+  const [batchFilter, setBatchFilter] = useState(searchParams.get('batch') || '');
   const [sortOption, setSortOption] = useState('name');
   const [page, setPage] = useState(1);
   const [sortApplied, setSortApplied] = useState(true);
@@ -189,6 +190,7 @@ function POIsContent() {
       if (categoryFilter !== 'all') params.set('category', categoryFilter);
       if (subcategoryFilter !== 'all') params.set('subcategory', subcategoryFilter);
       if (contentFilter !== 'all') params.set('content', contentFilter);
+      if (batchFilter) params.set('batch', batchFilter);
       
       const [sortBy, sortOrder] = sortOption.includes('-') 
         ? sortOption.split('-') 
@@ -214,7 +216,7 @@ function POIsContent() {
     } finally {
       setLoading(false);
     }
-  }, [user, searchQuery, categoryFilter, subcategoryFilter, contentFilter, sortOption, page]);
+  }, [user, searchQuery, categoryFilter, subcategoryFilter, contentFilter, sortOption, page, batchFilter]);
 
   useEffect(() => {
     const debounce = setTimeout(() => {
@@ -836,7 +838,7 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
           )}
 
           {/* Active Filters */}
-          {(categoryFilter !== 'all' || subcategoryFilter !== 'all' || contentFilter !== 'all') && (
+          {(categoryFilter !== 'all' || subcategoryFilter !== 'all' || contentFilter !== 'all' || batchFilter) && (
             <div className="flex flex-wrap items-center gap-2 mb-4">
               <span className="text-xs text-gray-500">Filtres actifs:</span>
               {categoryFilter !== 'all' && (
@@ -849,6 +851,12 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
                 <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded-lg text-xs text-gray-300">
                   Sous-cat: {subcategoryFilter}
                   <button onClick={() => setSubcategoryFilter('all')} className="text-gray-500 hover:text-gray-300">×</button>
+                </span>
+              )}
+              {batchFilter && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded-lg text-xs text-gray-300">
+                  Lot d&apos;enrichissement: {batchFilter}
+                  <button onClick={() => setBatchFilter('')} className="text-gray-500 hover:text-gray-300">×</button>
                 </span>
               )}
               {contentFilter !== 'all' && (

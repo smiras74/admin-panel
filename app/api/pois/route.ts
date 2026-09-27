@@ -101,6 +101,9 @@ async function handleGET(request: NextRequest) {
     let base: Query = db.collection(colName);
     if (category !== 'all') base = base.where('category', '==', category);
     if (subcategory !== 'all') base = base.where('subcategory', '==', subcategory);
+    // Review a batch-enrichment run: /pois?batch=trial-2026-09-27
+    const batch = sp.get('batch');
+    if (batch) base = base.where('enrichmentBatch', '==', batch);
 
     // Content stats for the current category/subcategory scope (count aggregations)
     const cnt = async (q: Query) => (await q.count().get()).data().count;
@@ -175,7 +178,7 @@ async function handleGET(request: NextRequest) {
 
     // ---------- BROWSE MODE ----------
     let q = contentWhere(base, content);
-    const hasFilters = category !== 'all' || subcategory !== 'all' || content !== 'all';
+    const hasFilters = category !== 'all' || subcategory !== 'all' || content !== 'all' || !!batch;
     const sortField = SORT_FIELDS[sortBy] || 'name';
     // Ordering by a field together with equality filters would need composite indexes;
     // with filters we page in document-id order instead (reported via sortApplied=false).
