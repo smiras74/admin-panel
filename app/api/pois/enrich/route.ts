@@ -1,117 +1,73 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAdmin } from '@/lib/admin-auth';
+import { tokenize } from '@/lib/poi-derived';
 
 export const dynamic = 'force-dynamic';
 
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+// Real Wikipedia enrichment (fr.wikipedia.org). Finds the article by geosearch near the
+// POI (1 km) and requires a name match; falls back to a title search. Returns the
+// article summary and its main image. Nothing is generated.
+
+const WIKI = 'https://fr.wikipedia.org';
+const UA = { 'User-Agent': 'GuideDuDetourAdmin/1.0 (admin panel)' };
+const STOP = new Set(['le', 'la', 'les', 'de', 'du', 'des', 'et', 'en', 'au', 'aux', 'sur', 'saint', 'sainte', 'st']);
+
+function nameScore(poiName: string, title: string): number {
+  const a = tokenize(poiName).filter(t => !STOP.has(t));
+  const b = new Set(tokenize(title));
+  if (!a.length) return 0;
+  return a.filter(t => b.has(t)).length / a.length;
+}
+
+async function findTitle(name: string, lat?: number, lon?: number): Promise<string | null> {
+  if (typeof lat === 'number' && typeof lon === 'number') {
+    const url = `${WIKI}/w/api.php?action=query&list=geosearch&gscoord=${lat}|${lon}&gsradius=1000&gslimit=30&format=json&origin=*`;
+    const r = await fetch(url, { headers: UA });
+    if (r.ok) {
+      const pages: { title: string }[] = (await r.json())?.query?.geosearch || [];
+      const best = pages
+        .map(p => ({ title: p.title, s: nameScore(name, p.title) }))
+        .sort((x, y) => y.s - x.s)[0];
+      // >= 2/3 of significant words must match ("La Brocante de Serris" must not match "Canton de Serris")
+      if (best && best.s >= 0.66) return best.title;
+    }
+    // With coordinates, never fall back to a France-wide title search:
+    // "Église Saint-Pierre" would match a homonym in another town.
+    return null;
+  }
+  const url = `${WIKI}/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(name)}&srlimit=5&format=json&origin=*`;
+  const r = await fetch(url, { headers: UA });
+  if (!r.ok) return null;
+  const hits: { title: string }[] = (await r.json())?.query?.search || [];
+  const best = hits.map(h => ({ title: h.title, s: nameScore(name, h.title) })).sort((x, y) => y.s - x.s)[0];
+  // Without coordinates we require a strong title match to avoid homonyms
+  return best && best.s >= 0.8 ? best.title : null;
+}
 
 async function handlePOST(request: NextRequest) {
   try {
-    const { name, category, subcategory, latitude, longitude, existingDescription } = await request.json();
+    const { name, latitude, longitude } = await request.json();
+    if (!name) return NextResponse.json({ error: 'Name is required' }, { status: 400 });
 
-    if (!name) {
-      return NextResponse.json({ error: 'Name is required' }, { status: 400 });
-    }
+    const title = await findTitle(name, latitude, longitude);
+    if (!title) return NextResponse.json({ success: true, found: false });
 
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: 'GROQ_API_KEY not configured' }, { status: 500 });
-    }
-
-    // Build context
-    const locationContext = latitude && longitude 
-      ? `situé aux coordonnées ${latitude.toFixed(6)}, ${longitude.toFixed(6)} en France`
-      : 'en France';
-    
-    const categoryContext = subcategory 
-      ? `(catégorie: ${category}, sous-catégorie: ${subcategory})`
-      : category 
-        ? `(catégorie: ${category})`
-        : '';
-
-    const existingContext = existingDescription 
-      ? `\n\nDescription existante (à améliorer ou remplacer si incorrecte): "${existingDescription}"`
-      : '';
-
-    const prompt = `Tu es un guide touristique expert de la France.
-
-Recherche et décris ce lieu : "${name}" ${categoryContext}, ${locationContext}.${existingContext}
-
-INSTRUCTIONS:
-1. Écris une description factuelle et utile de 2-4 phrases (80-150 mots)
-2. Mentionne ce qui rend ce lieu intéressant ou unique
-3. Si c'est un restaurant/café/commerce, décris le type de cuisine ou les spécialités
-4. Indique les horaires d'ouverture si tu les connais
-5. Sois précis et informatif, pas de formules vagues
-6. Écris en français
-
-FORMAT DE RÉPONSE (respecte exactement ce format):
-DESCRIPTION: [ta description ici]
-HORAIRES: [horaires d'ouverture ou "Non disponibles" si inconnus]
-
-Exemple de bonne réponse:
-DESCRIPTION: Restaurant traditionnel français proposant une cuisine du terroir avec des produits locaux. La carte change selon les saisons et met en avant les spécialités régionales. Terrasse agréable aux beaux jours.
-HORAIRES: Mar-Sam 12h-14h et 19h-22h, fermé dimanche et lundi`;
-
-    const response = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'user', content: prompt }
-        ],
-        max_tokens: 400,
-        temperature: 0.5,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      console.error('Groq API error:', error);
-      return NextResponse.json({ error: error.error?.message || 'Groq API error' }, { status: 500 });
-    }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content?.trim();
-
-    if (!content) {
-      return NextResponse.json({ error: 'No description generated' }, { status: 500 });
-    }
-
-    // Parse response
-    let description = content;
-    let openingHours = '';
-
-    // Try to extract structured data
-    const descMatch = content.match(/DESCRIPTION:\s*(.+?)(?=HORAIRES:|$)/s);
-    const hoursMatch = content.match(/HORAIRES:\s*(.+?)$/s);
-
-    if (descMatch) {
-      description = descMatch[1].trim();
-    }
-    if (hoursMatch) {
-      const hours = hoursMatch[1].trim();
-      if (hours.toLowerCase() !== 'non disponibles' && hours.toLowerCase() !== 'non disponible') {
-        openingHours = hours;
-      }
-    }
+    const r = await fetch(`${WIKI}/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/ /g, '_'))}`, { headers: UA });
+    if (!r.ok) return NextResponse.json({ success: true, found: false });
+    const s = await r.json();
+    if (s.type === 'disambiguation') return NextResponse.json({ success: true, found: false });
 
     return NextResponse.json({
       success: true,
-      description,
-      openingHours: openingHours || null,
+      found: true,
+      title: s.title,
+      description: s.extract || null,
+      photoUrl: s.originalimage?.source || s.thumbnail?.source || null,
+      sourceUrl: s.content_urls?.desktop?.page || `${WIKI}/wiki/${encodeURIComponent(title)}`,
     });
-
-  } catch (error) {
-    console.error('Error generating AI description:', error);
-    return NextResponse.json(
-      { error: 'Failed to generate AI description' },
-      { status: 500 }
-    );
+  } catch (error: any) {
+    console.error('Wikipedia enrichment error:', error);
+    return NextResponse.json({ error: 'Wikipedia enrichment failed: ' + error.message }, { status: 500 });
   }
 }
 

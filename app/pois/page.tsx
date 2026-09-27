@@ -375,7 +375,7 @@ function POIsContent() {
 
       if (response.ok) {
         const data = await response.json();
-        if (data.description || data.photoUrl) {
+        if (data.found && (data.description || data.photoUrl)) {
           setEditForm(prev => ({
             ...prev,
             description: data.description || prev.description,

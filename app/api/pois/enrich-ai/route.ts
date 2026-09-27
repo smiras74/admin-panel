@@ -33,24 +33,18 @@ async function handlePOST(request: NextRequest) {
       ? `\n\nDescription existante (à améliorer ou remplacer si incorrecte): "${existingDescription}"`
       : '';
 
-    const prompt = `Tu es un guide touristique expert de la France, passionné par les lieux insolites et les histoires locales.
+    const prompt = `Tu es un guide touristique expert de la France. Tu rédiges des fiches pour une application où la fiabilité est prioritaire.
 
-Génère une description captivante pour ce lieu : "${name}" ${categoryContext}, ${locationContext}.${existingContext}
+Lieu : "${name}" ${categoryContext}, ${locationContext}.${existingContext}
 
-RÈGLES IMPORTANTES:
-1. La description doit faire 2-4 phrases maximum (80-150 mots)
-2. Commence directement par le contenu, pas par "Ce lieu..." ou "Situé..."
-3. Inclus UN fait intéressant, anecdote historique ou détail insolite si possible
-4. Utilise un ton chaleureux et engageant, comme un ami local qui partage un bon plan
-5. Si c'est un restaurant/café, mentionne l'ambiance ou une spécialité si tu la connais
-6. Si tu ne connais pas ce lieu spécifique, génère une description plausible basée sur le nom et la catégorie
-7. Écris en français
+RÈGLES STRICTES:
+1. N'écris QUE des faits dont tu es sûr pour CE lieu précis. N'invente jamais de date, d'anecdote, de recette, de chiffre ou d'histoire.
+2. Si tu ne connais pas ce lieu précis, réponds exactement: INCONNU
+3. 2 à 4 phrases (60-120 mots), ton chaleureux mais factuel, en français.
+4. Commence directement par le contenu (pas "Ce lieu..." ni "Situé...").
+5. Ne mentionne pas d'horaires d'ouverture.
 
-EXEMPLES DE BON STYLE:
-- "Ancienne gare reconvertie en café-librairie, ce lieu atypique mêle odeur de vieux livres et arôme de café torréfié. Les habitués viennent ici pour le fameux chocolat chaud 'du chef de gare', recette secrète depuis 1952."
-- "Un lavoir du XIXe siècle remarquablement préservé où les anciens du village racontent encore les histoires qui s'échangeaient pendant les lavées. La charpente en châtaignier est d'origine."
-
-Réponds UNIQUEMENT avec la description, sans guillemets ni préambule.`;
+Réponds UNIQUEMENT avec la description (ou INCONNU), sans guillemets ni préambule.`;
 
     const response = await fetch(GROQ_API_URL, {
       method: 'POST',
@@ -64,7 +58,7 @@ Réponds UNIQUEMENT avec la description, sans guillemets ni préambule.`;
           { role: 'user', content: prompt }
         ],
         max_tokens: 300,
-        temperature: 0.7,
+        temperature: 0.2,
       }),
     });
 
@@ -77,13 +71,15 @@ Réponds UNIQUEMENT avec la description, sans guillemets ni préambule.`;
     const data = await response.json();
     const description = data.choices?.[0]?.message?.content?.trim();
 
-    if (!description) {
-      return NextResponse.json({ error: 'No description generated' }, { status: 500 });
+    if (!description || /^INCONNU\b/i.test(description)) {
+      return NextResponse.json({ error: 'Lieu inconnu du modèle — aucune description générée (pas d\'invention)' }, { status: 422 });
     }
 
     return NextResponse.json({
       success: true,
       description,
+      // Opening hours are never generated: an LLM guess is not reliable data
+      openingHours: null,
     });
 
   } catch (error) {
