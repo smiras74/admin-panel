@@ -386,6 +386,9 @@ function POIsContent() {
       if (response.ok) {
         const data = await response.json();
         if (data.found && (data.description || data.photoUrl)) {
+          if (!data.description) {
+            alert('Pas d\'article Wikipédia pour ce lieu — seule la photo Wikimedia a été ajoutée');
+          }
           setEditForm(prev => ({
             ...prev,
             description: data.description || prev.description,
@@ -397,7 +400,8 @@ function POIsContent() {
           alert('Aucune donnée Wikipedia trouvée pour ce lieu');
         }
       } else {
-        alert('Erreur lors de l\'enrichissement');
+        const err = await response.json().catch(() => ({}));
+        alert(err.error || 'Erreur lors de l\'enrichissement');
       }
     } catch (error) {
       console.error('Error enriching POI:', error);

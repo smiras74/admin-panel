@@ -9,7 +9,8 @@ import { tokenize } from './poi-derived';
 
 const WIKI = 'https://fr.wikipedia.org';
 const WIKIDATA = 'https://www.wikidata.org';
-const UA = { 'User-Agent': 'GuideDuDetourAdmin/1.0 (Guide du Detour admin panel; POI enrichment)' };
+// Wikimedia throttles generic user agents hard; a contact URL is required by their policy
+const UA = { 'User-Agent': 'GuideDuDetourAdmin/1.0 (https://detours.studio) POI-enrichment' };
 const STOP = new Set(['le', 'la', 'les', 'de', 'du', 'des', 'et', 'en', 'au', 'aux', 'sur', 'saint', 'sainte', 'st']);
 const MAX_CHARS = 1400;
 
@@ -20,11 +21,26 @@ function nameScore(poiName: string, title: string): number {
   return a.filter(t => b.has(t)).length / a.length;
 }
 
-async function getJson(url: string) {
+export class WikiRateLimitError extends Error {}
+
+// Retries on 429/5xx; a persistent 429 surfaces as WikiRateLimitError instead of "not found"
+async function getJson(url: string, attempt = 0): Promise<any> {
   const r = await fetch(url, { headers: UA });
+  if (r.status === 429 || r.status >= 500) {
+    if (attempt < 2) {
+      await new Promise(res => setTimeout(res, 800 * (attempt + 1)));
+      return getJson(url, attempt + 1);
+    }
+    if (r.status === 429) throw new WikiRateLimitError('Wikimedia rate limit');
+  }
   if (!r.ok) throw new Error(`HTTP ${r.status} ${url.split('?')[0]}`);
   return r.json();
 }
+
+const softFail = <T>(fallback: T) => (e: unknown): T => {
+  if (e instanceof WikiRateLimitError) throw e;
+  return fallback;
+};
 
 function commonsUrl(file: string) {
   return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file.replace(/ /g, '_'))}?width=1600`;
@@ -102,23 +118,23 @@ export async function fetchWikipediaSummary(
   let matchedBy: WikiResult['matchedBy'] | null = null;
 
   if (wikidataId && /^Q\d+$/.test(wikidataId)) {
-    const wd = await fromWikidata(wikidataId).catch(() => ({ title: null, image: null }));
+    const wd = await fromWikidata(wikidataId).catch(softFail({ title: null as string | null, image: null as string | null }));
     title = wd.title;
     image = wd.image;
     if (title || image) matchedBy = 'wikidata';
   }
   const hasCoords = typeof latitude === 'number' && typeof longitude === 'number';
   if (!title && hasCoords) {
-    title = await geoTitle(name, latitude!, longitude!, 1000).catch(() => null);
+    title = await geoTitle(name, latitude!, longitude!, 1000).catch(softFail(null));
     if (title) matchedBy = 'geo-1km';
     else {
-      title = await geoTitle(name, latitude!, longitude!, 3000).catch(() => null);
+      title = await geoTitle(name, latitude!, longitude!, 3000).catch(softFail(null));
       if (title) matchedBy = 'geo-3km';
     }
   }
   // With coordinates, never fall back to a France-wide title search (homonyms)
   if (!title && !hasCoords && !matchedBy) {
-    title = await searchTitle(name).catch(() => null);
+    title = await searchTitle(name).catch(softFail(null));
     if (title) matchedBy = 'title';
   }
   if (!matchedBy) return null;
@@ -128,7 +144,7 @@ export async function fetchWikipediaSummary(
   if (title) {
     const d = await getJson(
       `${WIKI}/w/api.php?action=query&prop=extracts|pageimages|pageprops&exintro=1&explaintext=1&piprop=original&redirects=1&format=json&titles=${encodeURIComponent(title)}`
-    ).catch(() => null);
+    ).catch(softFail(null));
     const page: any = d ? Object.values(d?.query?.pages || {})[0] : null;
     if (page && page.missing === undefined && page.pageprops?.disambiguation === undefined) {
       extract = page.extract ? cleanIntro(page.extract) || null : null;

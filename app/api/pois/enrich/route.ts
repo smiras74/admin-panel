@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { withAdmin } from '@/lib/admin-auth';
-import { fetchWikipediaSummary } from '@/lib/wikipedia';
+import { fetchWikipediaSummary, WikiRateLimitError } from '@/lib/wikipedia';
 import { findPoiData } from '@/lib/poi-lookup';
 
 export const dynamic = 'force-dynamic';
@@ -31,6 +31,9 @@ async function handlePOST(request: NextRequest) {
       matchedBy: wiki.matchedBy,
     });
   } catch (error: any) {
+    if (error instanceof WikiRateLimitError) {
+      return NextResponse.json({ error: 'Wikipédia limite les requêtes — réessayez dans une minute' }, { status: 503 });
+    }
     console.error('Wikipedia enrichment error:', error);
     return NextResponse.json({ error: 'Wikipedia enrichment failed: ' + error.message }, { status: 500 });
   }

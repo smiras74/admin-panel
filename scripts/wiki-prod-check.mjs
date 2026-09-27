@@ -31,7 +31,7 @@ for (const d of sample) {
   if (j.description) { withText++; chars.push(j.description.length); }
   if (j.photoUrl) withPhoto++;
   console.log(`${(x.wikidataId ? 'WD ' : '   ')}${x.name.slice(0, 38).padEnd(38)} ${r.status} ${j.found ? j.matchedBy.padEnd(8) : '—'.padEnd(8)} ${j.description ? j.description.length + ' ch' : ''} ${j.photoUrl ? '📷' : ''} ${j.title || j.error || ''}`);
-  await new Promise(res => setTimeout(res, 800));
+  await new Promise(res => setTimeout(res, 2500));
 }
 const avg = chars.length ? Math.round(chars.reduce((a, b) => a + b, 0) / chars.length) : 0;
 console.log(`\nsample=${sample.length} found=${found} withText=${withText} withPhoto=${withPhoto} avgChars=${avg}`);
