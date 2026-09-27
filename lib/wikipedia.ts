@@ -124,7 +124,13 @@ export async function fetchWikipediaSummary(
     if (title || image) matchedBy = 'wikidata';
   }
   const hasCoords = typeof latitude === 'number' && typeof longitude === 'number';
-  if (!title && hasCoords) {
+  // Generic one-word names ("Calvaire", "Cimetière", "Synagogue") match any nearby article:
+  // only accept an article practically at the same spot.
+  const generic = tokenize(name).filter(t => !STOP.has(t)).length < 2;
+  if (!title && hasCoords && generic) {
+    title = await geoTitle(name, latitude!, longitude!, 250).catch(softFail(null));
+    if (title) matchedBy = 'geo-1km';
+  } else if (!title && hasCoords) {
     title = await geoTitle(name, latitude!, longitude!, 1000).catch(softFail(null));
     if (title) matchedBy = 'geo-1km';
     else {
