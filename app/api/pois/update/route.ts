@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { withAdmin } from '@/lib/admin-auth';
+import { photoWriteFields } from '@/lib/poi-photos';
 
 export const dynamic = 'force-dynamic';
 
@@ -84,14 +85,9 @@ async function handlePOST(request: NextRequest) {
       updateData.description = description;
     }
 
-    if (photoUrls !== undefined) {
-      updateData.photoUrls = photoUrls;
-      // Set first photo as main photoUrl for compatibility
-      if (photoUrls.length > 0) {
-        updateData.photoUrl = photoUrls[0];
-      } else {
-        updateData.photoUrl = '';
-      }
+    if (Array.isArray(photoUrls)) {
+      // Write photos + photoUrls + photoUrl so iOS (reads `photos` first) stays in sync
+      Object.assign(updateData, photoWriteFields(photoUrls));
     }
 
     // Opening hours

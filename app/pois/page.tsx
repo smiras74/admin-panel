@@ -32,6 +32,7 @@ import {
 import { useAuth } from '@/lib/auth-context';
 import { Navigation } from '@/components/Navigation';
 import { apiFetch } from '@/lib/api-client';
+import { CATEGORIES, SUBCATEGORIES, isKnownCategory, isKnownSubcategory } from '@/lib/taxonomy';
 
 interface POI {
   id: string;
@@ -78,35 +79,6 @@ const SOURCE_LABELS: Record<string, { label: string; color: string; icon: any }>
   verified: { label: 'Vérifié', color: 'bg-green-900 text-green-300', icon: Verified },
   osm: { label: 'OSM', color: 'bg-blue-900 text-blue-300', icon: Database },
   user: { label: 'Utilisateur', color: 'bg-purple-900 text-purple-300', icon: Users },
-};
-
-const CATEGORIES = [
-  { value: 'all', label: 'Toutes catégories' },
-  { value: 'histoire', label: 'Histoire' },
-  { value: 'nature', label: 'Nature' },
-  { value: 'gastronomie', label: 'Gastronomie' },
-  { value: 'panorama', label: 'Panorama' },
-  { value: 'architecture', label: 'Architecture' },
-  { value: 'art', label: 'Art' },
-  { value: 'hedonisme', label: 'Hédonisme' },
-  { value: 'insolite', label: 'Insolite' },
-  { value: 'curiosites', label: 'Curiosités' },
-];
-
-const ALL_CATEGORIES = [
-  'histoire', 'nature', 'gastronomie', 'panorama', 
-  'architecture', 'art', 'hedonisme', 'insolite', 'curiosites'
-];
-
-const SUBCATEGORIES: Record<string, string[]> = {
-  histoire: ['monuments', 'chateaux', 'eglises', 'musees', 'sites-historiques', 'ruines', 'memorial', 'archeologie'],
-  nature: ['parcs', 'jardins', 'forets', 'lacs', 'cascades', 'grottes', 'reserves', 'points-de-vue', 'fermes'],
-  hedonisme: ['gastronomie', 'restaurants', 'cafes', 'bars', 'vins', 'vignobles', 'marches', 'spas', 'plages', 'brasseries', 'fromageries', 'brocantes', 'aires-de-repos', 'chambres-dhotes'],
-  insolite: ['street-art', 'lieux-abandonnes', 'curiosites', 'ovni', 'mystere'],
-  panorama: ['points-de-vue', 'belvederes', 'tours', 'collines'],
-  architecture: ['moderne', 'classique', 'art-deco', 'contemporain', 'religieux', 'industriel'],
-  art: ['galeries', 'sculptures', 'fresques', 'land-art', 'musees'],
-  curiosites: ['insolite', 'mystere', 'legende', 'paranormal'],
 };
 
 const SORT_OPTIONS = [
@@ -804,7 +776,7 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
                     onChange={(e) => setCategoryFilter(e.target.value)}
                     className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-forest-500"
                   >
-                    {CATEGORIES.map(cat => (
+                    {[{ value: 'all', label: 'Toutes catégories' }, ...CATEGORIES].map(cat => (
                       <option key={cat.value} value={cat.value}>{cat.label}</option>
                     ))}
                   </select>
@@ -1115,9 +1087,12 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
                     className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-forest-500 appearance-none cursor-pointer"
                   >
                     <option value="">Sélectionner...</option>
-                    {ALL_CATEGORIES.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
+                    {CATEGORIES.map(cat => (
+                      <option key={cat.value} value={cat.value}>{cat.label}</option>
                     ))}
+                    {editForm.category && !isKnownCategory(editForm.category) && (
+                      <option value={editForm.category}>{editForm.category} (inconnue dans l&apos;app)</option>
+                    )}
                   </select>
                 </div>
                 <div>
@@ -1129,11 +1104,11 @@ Source: [lien vers le site officiel, Google Maps, ou TripAdvisor]`;
                   >
                     <option value="">Sélectionner...</option>
                     {(SUBCATEGORIES[editForm.category] || []).map(sub => (
-                      <option key={sub} value={sub}>{sub}</option>
+                      <option key={sub.value} value={sub.value}>{sub.label}</option>
                     ))}
-                    {/* Allow custom value if current subcategory is not in list */}
-                    {editForm.subcategory && !SUBCATEGORIES[editForm.category]?.includes(editForm.subcategory) && (
-                      <option value={editForm.subcategory}>{editForm.subcategory}</option>
+                    {/* Legacy value unknown to the iOS app — shown so it is visible, not silently lost */}
+                    {editForm.subcategory && !isKnownSubcategory(editForm.category, editForm.subcategory) && (
+                      <option value={editForm.subcategory}>{editForm.subcategory} (inconnue dans l&apos;app)</option>
                     )}
                   </select>
                 </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { withAdmin } from '@/lib/admin-auth';
+import { readPhotos } from '@/lib/poi-photos';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,7 +82,7 @@ async function handleGET(request: NextRequest) {
         }
 
         // Photo and description checks
-        const photoUrls = data.photoUrls || (data.photoUrl ? [data.photoUrl] : []);
+        const photoUrls = readPhotos(data);
         const hasPhoto = photoUrls.length > 0;
         const hasDescription = !!data.description && data.description.trim().length > 0;
         const hasOpeningHours = !!data.openingHours;

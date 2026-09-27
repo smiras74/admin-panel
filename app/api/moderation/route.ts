@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { withAdmin } from '@/lib/admin-auth';
+import { readPhotos, photoWriteFields } from '@/lib/poi-photos';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,7 +41,7 @@ async function handleGET(request: NextRequest) {
             openingHours: data.openingHours || '',
             latitude: data.latitude,
             longitude: data.longitude,
-            photoUrls: data.photoUrls || (data.photoUrl ? [data.photoUrl] : []),
+            photoUrls: readPhotos(data),
             userId: data.createdBy || data.userId,
             status: data.status,
             createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
@@ -71,7 +72,7 @@ async function handleGET(request: NextRequest) {
             openingHours: data.openingHours || '',
             latitude: data.latitude || data.coordinate?._latitude,
             longitude: data.longitude || data.coordinate?._longitude,
-            photoUrls: data.photoUrls || (data.photoUrl ? [data.photoUrl] : []),
+            photoUrls: readPhotos(data),
             userId: data.createdBy || data.userId,
             status: data.status,
             createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
@@ -124,7 +125,7 @@ async function handleGET(request: NextRequest) {
                       openingHours: origData?.openingHours || '',
                       latitude: origData?.latitude || origData?.coordinate?._latitude,
                       longitude: origData?.longitude || origData?.coordinate?._longitude,
-                      photoUrls: origData?.photoUrls || (origData?.photoUrl ? [origData.photoUrl] : []),
+                      photoUrls: readPhotos(origData),
                     };
                     poiCollection = collectionName; // Remember where we found it
                     console.log(`Found POI ${poiId} in collection: ${collectionName}`);
@@ -311,7 +312,9 @@ async function handlePOST(request: NextRequest) {
         
         if (sourceCollection === 'pois') {
           // POI is already in 'pois' collection, just update status
+          const pendingSnap = await db.collection('pois').doc(id).get();
           await db.collection('pois').doc(id).update({
+            ...photoWriteFields(readPhotos(pendingSnap.data())),
             status: 'published',
             approvedAt: new Date(),
             approvedByAdmin: true,
@@ -327,6 +330,7 @@ async function handlePOST(request: NextRequest) {
             // Prepare data for main collection
             const publishedData = {
               ...poiData,
+              ...photoWriteFields(readPhotos(poiData)),
               status: 'published',
               approvedAt: new Date(),
               approvedByAdmin: true,
@@ -371,9 +375,11 @@ async function handlePOST(request: NextRequest) {
           if (changes.openingHours !== undefined) updateData.openingHours = changes.openingHours;
           if (changes.latitude !== undefined) updateData.latitude = changes.latitude;
           if (changes.longitude !== undefined) updateData.longitude = changes.longitude;
-          if (changes.photoUrls !== undefined) {
-            updateData.photoUrls = changes.photoUrls;
-            updateData.photoUrl = changes.photoUrls[0] || '';
+          if (Array.isArray(changes.photoUrls) && changes.photoUrls.length > 0) {
+            // Append submitted photos to existing ones — never replace the gallery
+            const current = await db.collection(targetCollection).doc(poiId).get();
+            const merged = [...readPhotos(current.data()), ...changes.photoUrls];
+            Object.assign(updateData, photoWriteFields(merged));
           }
 
           console.log(`Updating POI ${poiId} in ${targetCollection} with:`, updateData);

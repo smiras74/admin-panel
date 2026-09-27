@@ -19,6 +19,7 @@ import {
 import { useAuth } from '@/lib/auth-context';
 import { Navigation } from '@/components/Navigation';
 import { apiFetch } from '@/lib/api-client';
+import { CATEGORIES, SUBCATEGORIES, isKnownCategory, isKnownSubcategory } from '@/lib/taxonomy';
 
 interface PendingPOI {
   id: string;
@@ -780,26 +781,33 @@ function ModerationContent() {
                   <label className="block text-sm font-medium text-gray-300 mb-1">Catégorie</label>
                   <select
                     value={editForm.category}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, category: e.target.value }))}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, category: e.target.value, subcategory: '' }))}
                     className="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg text-gray-100 focus:border-forest-500 focus:outline-none"
                   >
                     <option value="">Sélectionner</option>
-                    <option value="culture">Culture</option>
-                    <option value="gastro">Gastronomie</option>
-                    <option value="nature">Nature</option>
-                    <option value="curiosites">Curiosités</option>
-                    <option value="hedonisme">Hédonisme</option>
+                    {CATEGORIES.map(cat => (
+                      <option key={cat.value} value={cat.value}>{cat.label}</option>
+                    ))}
+                    {editForm.category && !isKnownCategory(editForm.category) && (
+                      <option value={editForm.category}>{editForm.category} (inconnue dans l&apos;app)</option>
+                    )}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">Sous-catégorie</label>
-                  <input
-                    type="text"
+                  <select
                     value={editForm.subcategory}
                     onChange={(e) => setEditForm(prev => ({ ...prev, subcategory: e.target.value }))}
                     className="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg text-gray-100 focus:border-forest-500 focus:outline-none"
-                    placeholder="Optionnel"
-                  />
+                  >
+                    <option value="">Aucune</option>
+                    {(SUBCATEGORIES[editForm.category] || []).map(sub => (
+                      <option key={sub.value} value={sub.value}>{sub.label}</option>
+                    ))}
+                    {editForm.subcategory && !isKnownSubcategory(editForm.category, editForm.subcategory) && (
+                      <option value={editForm.subcategory}>{editForm.subcategory} (inconnue dans l&apos;app)</option>
+                    )}
+                  </select>
                 </div>
               </div>
 
