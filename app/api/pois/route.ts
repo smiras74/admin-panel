@@ -127,10 +127,9 @@ async function handleGET(request: NextRequest) {
       const jobs: Promise<void>[] = [];
       // 1) exact document id (all collections, OSM id variants)
       for (const c of [...BROWSE_COLLECTIONS, 'custom_pois', 'cached_pois']) {
-        for (const id of [search, `node/${search}`, `way/${search}`, `relation/${search}`]) {
-          if (id.includes('//')) continue;
-          jobs.push(db.collection(c).doc(id).get().then(d => add(d, c)).catch(() => {}));
-        }
+        // Document ids never contain '/', and doc('a/b') throws synchronously
+        if (search.includes('/')) continue;
+        jobs.push(db.collection(c).doc(search).get().then(d => add(d, c)).catch(() => {}));
       }
       // 2) word search on searchTokens (longest token is the most selective)
       if (tokens.length) {

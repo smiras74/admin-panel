@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAdmin } from '@/lib/admin-auth';
+import { fetchWikipediaSummary } from '@/lib/wikipedia';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,13 +30,19 @@ async function handlePOST(request: NextRequest) {
         ? `(catégorie: ${category})`
         : '';
 
+    // Ground the model in the Wikipedia summary when an article exists
+    const wiki = await fetchWikipediaSummary(name, latitude, longitude).catch(() => null);
+    const sourceContext = wiki
+      ? `\n\nSOURCE (Wikipédia, "${wiki.title}") — base-toi UNIQUEMENT sur ce texte:\n${wiki.extract}`
+      : '';
+
     const existingContext = existingDescription 
       ? `\n\nDescription existante (à améliorer ou remplacer si incorrecte): "${existingDescription}"`
       : '';
 
     const prompt = `Tu es un guide touristique expert de la France. Tu rédiges des fiches pour une application où la fiabilité est prioritaire.
 
-Lieu : "${name}" ${categoryContext}, ${locationContext}.${existingContext}
+Lieu : "${name}" ${categoryContext}, ${locationContext}.${sourceContext}${existingContext}
 
 RÈGLES STRICTES:
 1. N'écris QUE des faits dont tu es sûr pour CE lieu précis. N'invente jamais de date, d'anecdote, de recette, de chiffre ou d'histoire.
@@ -53,11 +60,12 @@ Réponds UNIQUEMENT avec la description (ou INCONNU), sans guillemets ni préamb
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        // llama-3.3-70b-versatile was retired by Groq (both AI buttons returned 500)
+        model: 'qwen/qwen3.8-27b',
         messages: [
           { role: 'user', content: prompt }
         ],
-        max_tokens: 300,
+        max_tokens: 1500,
         temperature: 0.2,
       }),
     });
@@ -69,7 +77,8 @@ Réponds UNIQUEMENT avec la description (ou INCONNU), sans guillemets ni préamb
     }
 
     const data = await response.json();
-    const description = data.choices?.[0]?.message?.content?.trim();
+    const raw: string = data.choices?.[0]?.message?.content || '';
+    const description = raw.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
 
     if (!description || /^INCONNU\b/i.test(description)) {
       return NextResponse.json({ error: 'Lieu inconnu du modèle — aucune description générée (pas d\'invention)' }, { status: 422 });

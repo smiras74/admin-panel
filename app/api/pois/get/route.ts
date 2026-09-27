@@ -30,12 +30,10 @@ async function handleGET(request: NextRequest) {
     }
 
     // Try multiple ID formats (OSM IDs can be stored as node/123, way/123, or just 123)
-    const idVariants = [
-      id,
-      `node/${id}`,
-      `way/${id}`,
-      `relation/${id}`,
-    ];
+    // Document ids are plain (OSM numeric id or UUID); 'node/123' is not a valid doc id
+    // and doc('node/123') throws — accept that input form by stripping the prefix.
+    const idVariants = Array.from(new Set([id.replace(/^(node|way|relation)\//, '')]))
+      .filter(v => v && !v.includes('/'));
 
     let doc = null;
     let foundInCollection = collection;
